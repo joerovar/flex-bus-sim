@@ -1,16 +1,16 @@
 class Stop:
     def __init__(self, id, name, stop_type, demand):
         self.id = id
-        self.name = name
         self.stop_type = stop_type
         self.demand = demand
 
 class Route:
-    def __init__(self, id, name, stops, sequence):
+    def __init__(self, id, stops, link_times):
         self.id = id
-        self.name = name
         self.stops = stops
-        self.sequence = sequence
+        self.link_times = link_times
+
+        ## in case they are flex segments
 
 class Passenger:
     def __init__(self, id, source_stop, destination_stop, arrival_time):

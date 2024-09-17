@@ -1,38 +1,27 @@
 import pandas as pd
-from objects import Stop, Route
-
-def load_data():
-    routes_df = pd.read_csv('routes.csv')
-    stops_df = pd.read_csv('stops.csv')
-    
-    stops = {}
-    for index, row in stops_df.iterrows():
-        stops[row['id']] = Stop(row['id'], row['name'], row['type'], row['demand'])
-    
-    routes = []
-    for index, row in routes_df.iterrows():
-        route_stops = [stops[stop_id] for stop_id in row['stops'].split(',')]
-        sequence = [stops[stop_id] for stop_id in row['sequence'].split(',')]
-        routes.append(Route(row['id'], row['name'], route_stops, sequence))
-    
-    return routes, stops
-
-import pandas as pd
 from objects import Stop, Route, Vehicle, Driver
+from params import *
 
 def load_data():
-    routes_df = pd.read_csv('data/routes.csv')
-    stops_df = pd.read_csv('data/stops.csv')
+    routes_df = pd.read_csv(PATH_ROUTES)
+    stops_df = pd.read_csv(PATH_STOPS)
     
     stops = {}
     for index, row in stops_df.iterrows():
-        stops[row['id']] = Stop(row['id'], row['name'], row['type'], row['demand'])
+        stops[row['stop_id']] = Stop(row['stop_id'], row['pax_per_hr'])
     
     routes = []
-    for index, row in routes_df.iterrows():
-        route_stops = [stops[stop_id] for stop_id in row['stops'].split(',')]
-        sequence = [stops[stop_id] for stop_id in row['sequence'].split(',')]
-        routes.append(Route(row['id'], row['name'], route_stops, sequence))
+    for route_id in routes_df['route_id'].unique():
+        route_df = routes_df[routes_df['route_id']==route_id]
+        for direction_id in (0,1):
+            route_dir_df = route_df[route_df['direction_id']==direction_id]
+            route_id = str(route_dir_df['route_id'].iloc[0]) + '-' + str(direction_id)
+            route_stops = route_dir_df['stop_id'].to_list()
+            route_stops = route_dir_df['stop_id'].to_list()
+            routes.append(Route(route_id, route_stops))
+        # route_stops = [stops[stop_id] for stop_id in row['stops'].split(',')]
+        # sequence = [stops[stop_id] for stop_id in row['sequence'].split(',')]
+        # routes.append(Route(row['route_id'], route_stops, sequence))
     
     return routes, stops
 
