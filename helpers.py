@@ -33,7 +33,7 @@ def get_poisson_arrival_times(arrival_rate, total_time):
     arrival_times = np.cumsum(inter_arrival_times)
     
     # Filter out arrival times that exceed the total_time_sec window
-    return arrival_times[arrival_times <= total_time_sec]
+    return arrival_times[arrival_times <= total_time_sec].round()
 
 def find_closest_vehicle(vehicles, current_time):
     """
@@ -60,7 +60,7 @@ def find_closest_vehicle(vehicles, current_time):
     
     return closest_index
 
-def pax_activity(vehicle, route):
+def pax_activity(vehicle, route, static_dwell, dynamic_dwell, time_now):
     """
     Simulates passenger activity at a stop by:
     1. Depositing passengers whose destination is the current stop.
@@ -88,7 +88,8 @@ def pax_activity(vehicle, route):
     stop_idx = vehicle.event['next']['stop']
 
     for pax in vehicle.pax:
-        if pax.dest == stop_idx:
+        if pax.destination == stop_idx:
+            pax.alight_time = time_now
             route.archived_pax.append(pax)
             departing_pax.append(pax)
             alightings += 1
@@ -98,12 +99,57 @@ def pax_activity(vehicle, route):
 
     stop_pax = route.stops[vehicle.direction][stop_idx].active_pax
     for pax in stop_pax:
+        pax.boarding_time = time_now
         vehicle.pax.append(pax)
         boardings += 1
 
     route.stops[vehicle.direction][stop_idx].active_pax = []
 
     total_pax = boardings + alightings
-    dwell_time = ((total_pax > 0) * 5) + total_pax * 2
+    dwell_time = ((total_pax > 0) * static_dwell) + total_pax * dynamic_dwell
+
+    ## add records
+    vehicle.event_hist['boardings'].append(boardings)
+    vehicle.event_hist['alightings'].append(alightings)
+    vehicle.event_hist['load'].append(len(vehicle.pax))
+    vehicle.event_hist['departure_time'].append(vehicle.event_hist['arrival_time'][-1] + dwell_time)
     
     return dwell_time
+
+def check_control_conditions(vehicle, control_stops):
+    is_in_control_stop = vehicle.event['next']['stop'] in control_stops
+    is_departing = vehicle.event['next']['type'] == 'depart'
+    return (is_in_control_stop and is_departing)
+
+def lognormal_sample(stats):
+    mean = stats['mean']
+    std = stats['std']
+    mu = np.log(mean**2 / np.sqrt(std**2 + mean**2))
+    sigma = np.sqrt(np.log(1 + (std**2 / mean**2)))
+    return round(np.random.lognormal(mu, sigma),0)
+
+
+def get_pax_hist(route):
+    pax_hist = {'direction': [], 'origin': [], 'destination': [], 'arrival_time': [], 'boarding_time': [], 'alight_time': []}
+
+    for pax in route.archived_pax:
+        pax_hist['direction'].append(pax.direction)
+        pax_hist['origin'].append(pax.origin)
+        pax_hist['destination'].append(pax.destination)
+        pax_hist['arrival_time'].append(pax.arrival_time)
+        pax_hist['boarding_time'].append(pax.boarding_time)
+        pax_hist['alight_time'].append(pax.alight_time)
+
+    pax_df = pd.DataFrame(pax_hist)
+    pax_df['wait_time'] = pax_df['boarding_time']-pax_df['arrival_time']
+    return pax_df
+
+def get_veh_hist(route):
+    veh_hist = []
+    for veh in route.vehicles:
+        df = pd.DataFrame(veh.event_hist)
+        df['veh_id'] = veh.idx
+        veh_hist.append(df)
+    veh_df = pd.concat(veh_hist, ignore_index=True)
+    veh_df['headway'] = veh_df.groupby(['direction', 'stop'])['arrival_time'].transform(lambda x: x.sort_values().diff())
+    return veh_df

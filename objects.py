@@ -1,27 +1,29 @@
 from helpers import *
 
 class Passenger:
-    def __init__(self, origin, dest, arrival_time) -> None:
+    def __init__(self, origin, destination, arrival_time, direction) -> None:
         self.origin = origin
-        self.dest = dest
+        self.destination = destination
+        self.direction = direction
         self.arrival_time = arrival_time
         self.boarding_time = None
         self.alight_time = None
 
 
 class Stop:
-    def __init__(self, idx) -> None:
+    def __init__(self, idx, direction) -> None:
         self.idx = idx
         self.active_pax = []
         self.inactive_pax_arrival_times = np.array([]) ## to easily filter
+        self.direction = direction
     
     def move_to_active_pax(self, time_now):
         tmp_times = self.inactive_pax_arrival_times
         any_pax_times = list(tmp_times[tmp_times <= time_now])
         if len(any_pax_times):
             for pax_time in any_pax_times:
-                dest = np.random.randint([i for i in range(self.idx+1, N_STOPS) if i not in FLEX_STOPS])
-                self.active_pax.append(Passenger(self.idx, dest, pax_time))
+                dest = np.random.choice([i for i in range(self.idx+1, N_STOPS) if i not in FLEX_STOPS])
+                self.active_pax.append(Passenger(self.idx, dest, pax_time, self.direction))
             self.inactive_pax_arrival_times = tmp_times[tmp_times>time_now]
 
 
@@ -37,27 +39,17 @@ class Schedule:
 
 class RouteManager:
     def __init__(self) -> None:
-        # self.n_stops = 7
-        # self.flex_stops = [2, 4]
-        n_vehicles = 2
-
         self.stops = {
-            'in': [Stop(i) for i in range(N_STOPS)],
-            'out': [Stop(i) for i in range(N_STOPS)]
-        }
-
-        self.arr_rates = {
-            'flex': 6,
-            'fixed': 10,
-            'terminal': 20
+            'in': [Stop(i, 'in') for i in range(N_STOPS)],
+            'out': [Stop(i, 'out') for i in range(N_STOPS)]
         }
         
-        self.vehicles = [Vehicle(i, i) for i in range(n_vehicles)]
+        self.vehicles = [Vehicle(i) for i in range(N_VEHICLES)]
 
-        ## used to count the trip for the vehicle
-        self.max_trip_nr = {
-            'in': n_vehicles,
-            'out': n_vehicles
+        ## used to track the latest assigned trip number
+        self.trip_counter = {
+            'in': 0,
+            'out': 0
         }
 
         self.archived_pax = []
@@ -66,41 +58,58 @@ class RouteManager:
     def load_all_pax(self):
         for direction in self.stops:
             set_stops = self.stops[direction]
-            for i in range(len(set_stops)):
+            for i in range(len(set_stops)-1):
                 if i == 0: ## terminal
-                    arr_rate = self.arr_rates['terminal']
+                    arr_rate = ARRIVAL_RATES['terminal']
                 if i in FLEX_STOPS:
-                    arr_rate = self.arr_rates['flex']
+                    arr_rate = ARRIVAL_RATES['flex']
                 if i > 0 and i not in FLEX_STOPS:
-                    arr_rate = self.arr_rates['fixed']
-                self.stops[direction].inactive_pax_arrival_times = get_poisson_arrival_times(arr_rate, MAX_TIME)
+                    arr_rate = ARRIVAL_RATES['fixed']
+                self.stops[direction][i].inactive_pax_arrival_times = get_poisson_arrival_times(arr_rate, MAX_TIME_HOURS)
     
     def get_active_pax(self, time_now):
         for direction in self.stops:
             set_stops = self.stops[direction]
             for i in range(len(set_stops)):
                 self.stops[direction][i].move_to_active_pax(time_now)
+    
+    def assign_next_trip(self, direction):
+        ## update trip counter for next direction
+        self.trip_counter[direction] += 1
 
+        ## get next scheduled departure for the specified direction
+        trip_idx = self.trip_counter[direction] - 1 ## minus 1 because departures index start from zero
+        schd_time = self.schedule.deps[direction][trip_idx]
+        return schd_time
 
 
 class Vehicle:
-    def __init__(self, trip_nr_in, trip_nr_out):
+    def __init__(self, idx):
+        self.idx = idx
         self.pax = []
-        self.direction = 'out' 
-        self.trip_nr = {
-            'in': trip_nr_in, ## starting from outbound
-            'out': trip_nr_out
+        self.direction = None
+        self.trip_counter = {
+            'in': 0, ## starting from outbound
+            'out': 0
         }
         self.event = {
             'last': {'time': None, 'type': None, 'stop': None},
             'next': {'time': None, 'type': None, 'stop': None}
         }
+
+        ## records
+        self.event_hist = {'direction': [], 'stop': [], 'arrival_time': [], 'departure_time': [], 'load': [],
+                           'boardings': [], 'alightings': []}
     
-    def start(self, schedule):
+    def start(self, route):
         self.direction = 'out'
-        ## next event is outbound departure
-        trip_nr = self.trip_nr[self.direction]
-        self.event['next']['time'] = schedule.deps[self.direction][trip_nr]
+
+        ## update route trip coutner and get the scheduled departure
+        next_schd_time = route.assign_next_trip(self.direction)
+        ## trip counter
+        self.trip_counter[self.direction] += 1
+
+        self.event['next']['time'] = next_schd_time
         self.event['next']['stop'] = 0
         self.event['next']['type'] = 'arrive'
     
@@ -108,17 +117,15 @@ class Vehicle:
         finish_time = time_now + dwell_time
         
         next_direction = 'in' if self.direction == 'out' else 'out'
-        next_trip_nr = route.max_trip_nr[next_direction] + 1
-        self.trip_nr[next_direction] = next_trip_nr
+        
+        ## update route trip coutner and get the scheduled departure
+        next_schd_time = route.assign_next_trip(next_direction)
 
-        ## add +1 to the latest trip number
-        route.max_trip_nr[next_direction] += 1
-
-        ## get next scheduled time
-        next_schedule_time = route.schedule.deps[next_direction][next_trip_nr]
+        ## update vehicle trip counter
+        self.trip_counter[next_direction] += 1
 
         ## the next event time is the latest between schedule and finish time
-        self.event['next']['time'] = max(next_schedule_time, finish_time)
+        self.event['next']['time'] = max(next_schd_time, finish_time)
         self.event['next']['type'] = 'arrive'
         self.event['next']['stop'] = 0
         self.direction = next_direction
@@ -126,27 +133,39 @@ class Vehicle:
     
     def arrive_station(self, route):
         time_now = self.event['next']['time']
-        dwell_time = pax_activity(self, route)
+        
+        ## append records
+        self.event_hist['direction'].append(self.direction)
+        self.event_hist['stop'].append(self.event['next']['stop'])
+        self.event_hist['arrival_time'].append(time_now)
+        
+        ## process
+        dwell_time = pax_activity(self, route, STATIC_DWELL, DYNAMIC_DWELL, time_now)
 
         self.event['last']['time'] = self.event['next']['time']
         self.event['last']['type'] = 'arrive'
+        self.event['last']['stop'] = self.event['next']['stop']
 
-        if self.event['next']['stop'] < N_STOPS - 2:
+        if self.event['next']['stop'] == N_STOPS - 1:
+            ## continue onto layover
+            self.layover(route, dwell_time, time_now)
+        else:
             self.event['next']['time'] = time_now + dwell_time
             self.event['next']['type'] = 'depart'
-        else:
-            self.layover(route, dwell_time, time_now)
 
     
     def depart_station(self, skip_flex=False):
         time_now = self.event['next']['time']
+
         ## set destination
         self.event['last']['time'] = time_now
         self.event['last']['type'] = 'depart'
         self.event['last']['stop'] = self.event['next']['stop']
         self.event['next']['type'] = 'arrive'
 
-        if skip_flex:
+        stop = self.event['next']['stop']
+
+        if skip_flex and (stop in CONTROL_STOPS):
             ## stop at 
             self.event['next']['stop'] += 2
         else:
@@ -154,10 +173,9 @@ class Vehicle:
 
         orig_flex = self.event['last']['stop'] in FLEX_STOPS
         dest_flex = self.event['next']['stop'] in FLEX_STOPS
-        if (orig_flex or dest_flex):
-            run_time = 1.5 * 60
-        else:
-            run_time = 2 * 60
+
+        segment_type = 'flex' if (orig_flex or dest_flex) else 'fixed'
+        run_time = lognormal_sample(SEGMENT_TIMES[segment_type])
         
         self.event['next']['time'] = time_now + run_time
 
@@ -165,24 +183,47 @@ class EventManager:
     def __init__(self) -> None:
         start_time = 0
         self.timestamps = [start_time]
+
+        self.done = 0
+        self.requires_control = 0
+        self.veh_idx = None
     
     def start_vehicles(self, route):
         for vehicle in route.vehicles:
-            vehicle.start(route.schedule)
+            vehicle.start(route)
 
-    def process_event(self):
-        return
-    
     def step(self, route, action=None):
-        veh_idx = find_closest_vehicle(route.vehicles, self.timestamps[-1])
-        route.get_active_pax(self.timestamps[-1])
+        if (action is not None) and (self.veh_idx is not None):
+            route.vehicles[self.veh_idx].depart_station(route)
+            return self.step(route)
+        
+        self.veh_idx = find_closest_vehicle(route.vehicles, self.timestamps[-1])
 
         ## add new time to list of timestamps
-        self.timestamps.append(route.vehicles[veh_idx].event['next']['time'])
+        self.timestamps.append(route.vehicles[self.veh_idx].event['next']['time'])
 
-        if route.vehicles[veh_idx].event['next']['type'] == 'arrive':
-            route.vehicles[veh_idx].arrive_station(route)
+        time_now = self.timestamps[-1]
         
-        if route.vehicles[veh_idx].event['next']['type'] == 'depart':
-            route.vehicles[veh_idx].depart_station(route)
+        if time_now > MAX_TIME_HOURS*60*60:
+            return (1, None, [])
+        
+        ## get all passengers up to the current time
+        route.get_active_pax(time_now)
+
+        requires_control = check_control_conditions(route.vehicles[self.veh_idx], CONTROL_STOPS)
+
+        if requires_control:
+            flex_stop_idx = route.vehicles[self.veh_idx].event['next']['stop'] + 1
+            direction = route.vehicles[self.veh_idx].direction
+            flex_stop = route.stops[direction][flex_stop_idx]
+            n_pax = len(flex_stop.active_pax)
+            return (0, None, [n_pax])
+        else:
+            if route.vehicles[self.veh_idx].event['next']['type'] == 'arrive':
+                route.vehicles[self.veh_idx].arrive_station(route)
+                return self.step(route)
+            
+            if route.vehicles[self.veh_idx].event['next']['type'] == 'depart':
+                route.vehicles[self.veh_idx].depart_station(route)
+                return self.step(route)
 
