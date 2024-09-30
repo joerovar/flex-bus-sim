@@ -154,7 +154,7 @@ class Vehicle:
             self.event['next']['type'] = 'depart'
 
     
-    def depart_station(self, skip_flex=False):
+    def depart_station(self, skip_flex=True):
         time_now = self.event['next']['time']
 
         ## set destination
@@ -194,7 +194,7 @@ class EventManager:
 
     def step(self, route, action=None):
         if (action is not None) and (self.veh_idx is not None):
-            route.vehicles[self.veh_idx].depart_station(route)
+            route.vehicles[self.veh_idx].depart_station(skip_flex=action)
             return self.step(route)
         
         self.veh_idx = find_closest_vehicle(route.vehicles, self.timestamps[-1])
@@ -217,13 +217,13 @@ class EventManager:
             direction = route.vehicles[self.veh_idx].direction
             flex_stop = route.stops[direction][flex_stop_idx]
             n_pax = len(flex_stop.active_pax)
-            return (0, None, [n_pax])
+            return 0, None, [n_pax]
         else:
             if route.vehicles[self.veh_idx].event['next']['type'] == 'arrive':
                 route.vehicles[self.veh_idx].arrive_station(route)
                 return self.step(route)
             
             if route.vehicles[self.veh_idx].event['next']['type'] == 'depart':
-                route.vehicles[self.veh_idx].depart_station(route)
+                route.vehicles[self.veh_idx].depart_station()
                 return self.step(route)
 

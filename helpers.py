@@ -129,7 +129,7 @@ def lognormal_sample(stats):
     return round(np.random.lognormal(mu, sigma),0)
 
 
-def get_pax_hist(route):
+def get_pax_hist(route, flex_stops):
     pax_hist = {'direction': [], 'origin': [], 'destination': [], 'arrival_time': [], 'boarding_time': [], 'alight_time': []}
 
     for pax in route.archived_pax:
@@ -142,9 +142,12 @@ def get_pax_hist(route):
 
     pax_df = pd.DataFrame(pax_hist)
     pax_df['wait_time'] = pax_df['boarding_time']-pax_df['arrival_time']
+
+    pax_df['flex'] = 0
+    pax_df.loc[pax_df['origin'].isin(flex_stops), 'flex'] = 1
     return pax_df
 
-def get_veh_hist(route):
+def get_veh_hist(route, flex_stops):
     veh_hist = []
     for veh in route.vehicles:
         df = pd.DataFrame(veh.event_hist)
@@ -152,4 +155,7 @@ def get_veh_hist(route):
         veh_hist.append(df)
     veh_df = pd.concat(veh_hist, ignore_index=True)
     veh_df['headway'] = veh_df.groupby(['direction', 'stop'])['arrival_time'].transform(lambda x: x.sort_values().diff())
+
+    veh_df['flex'] = 0
+    veh_df.loc[veh_df['stop'].isin(flex_stops), 'flex'] = 1
     return veh_df
