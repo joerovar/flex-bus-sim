@@ -26,6 +26,16 @@ class Stop:
                 self.active_pax.append(Passenger(self.idx, dest, pax_time, self.direction))
             self.inactive_pax_arrival_times = tmp_times[tmp_times>time_now]
 
+    def remove_long_wait_pax(self, time_now):
+        ## only flex pax
+        long_wait_pax = []
+        for pax in self.active_pax:
+            if time_now - pax.arrival_time > MAX_WAIT_TIME_FLEX * 60:
+                long_wait_pax.append(pax)
+        for pax in long_wait_pax:
+            self.active_pax.remove(pax)
+        return long_wait_pax
+
 
 class Schedule:
     def __init__(self) -> None:
@@ -54,6 +64,13 @@ class RouteManager:
 
         self.archived_pax = []
         self.schedule = Schedule()
+        self.denied_flex_pax = []
+        self.inter_event = {
+            'denied': 0,
+            'fixed_wait_time': 0,
+            'late': 0,
+            'fixed_boardings': 0
+        }
 
     def load_all_pax(self):
         for direction in self.stops:
@@ -71,6 +88,12 @@ class RouteManager:
         for direction in self.stops:
             set_stops = self.stops[direction]
             for i in range(len(set_stops)):
+                ## discard first if flex
+                if i in FLEX_STOPS and REMOVE_LONG_WAIT_FLEX:
+                    denied_flex_pax = self.stops[direction][i].remove_long_wait_pax(time_now)
+                    self.denied_flex_pax += denied_flex_pax
+                    self.inter_event['denied'] += len(denied_flex_pax)
+
                 self.stops[direction][i].move_to_active_pax(time_now)
     
     def assign_next_trip(self, direction):
@@ -98,7 +121,8 @@ class Vehicle:
         }
 
         ## records
-        self.event_hist = {'direction': [], 'stop': [], 'arrival_time': [], 'departure_time': [], 'load': [],
+        self.event_hist = {'direction': [], 'stop': [], 'arrival_time': [], 
+                           'departure_time': [], 'load': [],
                            'boardings': [], 'alightings': []}
     
     def start(self, route):
@@ -129,6 +153,10 @@ class Vehicle:
         self.event['next']['type'] = 'arrive'
         self.event['next']['stop'] = 0
         self.direction = next_direction
+
+        ## update the late arrivals counter
+        if self.event['next']['time'] > next_schd_time + SCHEDULE_TOLERANCE:
+            route.inter_event['late'] += 1
         
     
     def arrive_station(self, route):
@@ -140,7 +168,8 @@ class Vehicle:
         self.event_hist['arrival_time'].append(time_now)
         
         ## process
-        dwell_time = pax_activity(self, route, STATIC_DWELL, DYNAMIC_DWELL, time_now)
+        is_flex = self.event['next']['stop'] in FLEX_STOPS
+        dwell_time = pax_activity(self, route, STATIC_DWELL, DYNAMIC_DWELL, time_now, is_flex=is_flex)
 
         self.event['last']['time'] = self.event['next']['time']
         self.event['last']['type'] = 'arrive'
@@ -194,6 +223,11 @@ class EventManager:
 
     def step(self, route, action=None):
         if (action is not None) and (self.veh_idx is not None):
+            ## reset counters
+            for ky in route.inter_event:
+                route.inter_event[ky] = 0
+
+            ## perform event
             route.vehicles[self.veh_idx].depart_station(skip_flex=action)
             return self.step(route)
         
@@ -205,7 +239,12 @@ class EventManager:
         time_now = self.timestamps[-1]
         
         if time_now > MAX_TIME_HOURS*60*60:
-            return (1, None, [])
+            ## RETURN TUPLE ACCORDING TO GYM (OBSERVATION, REWARD, TERMINATED, TRUNCATED, INFO)
+            obs = []
+            reward = None
+            terminated, truncated = 1, 1
+            info = {}
+            return obs, reward, terminated, truncated, info
         
         ## get all passengers up to the current time
         route.get_active_pax(time_now)
@@ -217,13 +256,22 @@ class EventManager:
             direction = route.vehicles[self.veh_idx].direction
             flex_stop = route.stops[direction][flex_stop_idx]
             n_pax = len(flex_stop.active_pax)
-            return 0, None, [n_pax]
-        else:
-            if route.vehicles[self.veh_idx].event['next']['type'] == 'arrive':
-                route.vehicles[self.veh_idx].arrive_station(route)
-                return self.step(route)
+
+            ## we will only request an action if there are flex route passengers waiting
+            if n_pax:
+                ## RETURN TUPLE ACCORDING TO GYM (OBSERVATION, REWARD, TERMINATED, TRUNCATED, INFO)
+                obs = [n_pax]
+                reward = sum([route.inter_event[ky] for ky in route.inter_event])
+                terminated, truncated = 0, 0
+                info = route.inter_event
+                return obs, reward, terminated, truncated, info
             
-            if route.vehicles[self.veh_idx].event['next']['type'] == 'depart':
-                route.vehicles[self.veh_idx].depart_station()
-                return self.step(route)
+        ## if no control required 
+        if route.vehicles[self.veh_idx].event['next']['type'] == 'arrive':
+            route.vehicles[self.veh_idx].arrive_station(route)
+            return self.step(route)
+        
+        if route.vehicles[self.veh_idx].event['next']['type'] == 'depart':
+            route.vehicles[self.veh_idx].depart_station()
+            return self.step(route)
 

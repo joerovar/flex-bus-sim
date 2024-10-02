@@ -18,3 +18,23 @@ ARRIVAL_RATES = {
             'fixed': 10,
             'terminal': 16
 }
+
+MAX_WAIT_TIME_FLEX = 15 # minutes
+REMOVE_LONG_WAIT_FLEX = True
+SCHEDULE_TOLERANCE = 3
+
+## State definition
+STATE_DIM = 3
+
+LOW = [
+    0, ## HEADWAY
+    0, ## Occupancy
+    0 ## Control stop
+]
+
+HIGH = [
+    3, # headway
+    3, # occupancy
+    2, # control stop
+]
+

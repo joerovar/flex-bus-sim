@@ -60,7 +60,7 @@ def find_closest_vehicle(vehicles, current_time):
     
     return closest_index
 
-def pax_activity(vehicle, route, static_dwell, dynamic_dwell, time_now):
+def pax_activity(vehicle, route, static_dwell, dynamic_dwell, time_now, is_flex):
     """
     Simulates passenger activity at a stop by:
     1. Depositing passengers whose destination is the current stop.
@@ -83,6 +83,7 @@ def pax_activity(vehicle, route, static_dwell, dynamic_dwell, time_now):
     """
     boardings = 0
     alightings = 0
+    wait_time_accumulator = 0
     
     departing_pax = []
     stop_idx = vehicle.event['next']['stop']
@@ -101,6 +102,7 @@ def pax_activity(vehicle, route, static_dwell, dynamic_dwell, time_now):
     for pax in stop_pax:
         pax.boarding_time = time_now
         vehicle.pax.append(pax)
+        wait_time_accumulator += (time_now - pax.arrival_time)
         boardings += 1
 
     route.stops[vehicle.direction][stop_idx].active_pax = []
@@ -113,7 +115,11 @@ def pax_activity(vehicle, route, static_dwell, dynamic_dwell, time_now):
     vehicle.event_hist['alightings'].append(alightings)
     vehicle.event_hist['load'].append(len(vehicle.pax))
     vehicle.event_hist['departure_time'].append(vehicle.event_hist['arrival_time'][-1] + dwell_time)
-    
+
+    ## update route wait time
+    if not is_flex:
+        route.inter_event['fixed_wait_time'] += wait_time_accumulator ## hours
+        route.inter_event['fixed_boardings'] += boardings
     return dwell_time
 
 def check_control_conditions(vehicle, control_stops):
