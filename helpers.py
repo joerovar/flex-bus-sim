@@ -165,3 +165,6 @@ def get_veh_hist(route, flex_stops):
     veh_df['flex'] = 0
     veh_df.loc[veh_df['stop'].isin(flex_stops), 'flex'] = 1
     return veh_df
+
+def pct_change(val_from, val_to, decimals=2):
+    return round((val_to - val_from) / val_from, decimals)

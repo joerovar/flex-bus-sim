@@ -16,6 +16,7 @@ class Stop:
         self.active_pax = []
         self.inactive_pax_arrival_times = np.array([]) ## to easily filter
         self.direction = direction
+        self.last_arrival_time = [-SCHEDULE_HEADWAY*60]
     
     def move_to_active_pax(self, time_now):
         tmp_times = self.inactive_pax_arrival_times
@@ -39,12 +40,9 @@ class Stop:
 
 class Schedule:
     def __init__(self) -> None:
-        schedule_headway = 10 ## minutes
-        n_trips = 100
-        half_cycle_time = 10
         self.deps = {
-            'out': [i*schedule_headway*60 for i in range(n_trips)],
-            'in': [half_cycle_time*60 + i*schedule_headway*60 for i in range(n_trips)]
+            'out': [i*SCHEDULE_HEADWAY*60 for i in range(N_TRIPS)],
+            'in': [HALF_CYCLE_TIME*60 + i*SCHEDULE_HEADWAY*60 for i in range(N_TRIPS)]
         }
 
 class RouteManager:
@@ -60,6 +58,11 @@ class RouteManager:
         self.trip_counter = {
             'in': 0,
             'out': 0
+        }
+
+        self.idle_time = {
+            'time': [],
+            'idle_time': []
         }
 
         self.archived_pax = []
@@ -104,6 +107,22 @@ class RouteManager:
         trip_idx = self.trip_counter[direction] - 1 ## minus 1 because departures index start from zero
         schd_time = self.schedule.deps[direction][trip_idx]
         return schd_time
+
+    def get_reward(self, event):
+        reward_1 = self.inter_event['denied'] * REWARD_WEIGHTS['denied']
+        
+        reward_2 = self.inter_event['fixed_wait_time'] / np.max([self.inter_event['fixed_boardings'], 1]) 
+        reward_2 *= REWARD_WEIGHTS['fixed_wait_time']
+        
+        reward_3 = self.inter_event['late'] * REWARD_WEIGHTS['late']
+        
+        tot_reward = reward_1 + reward_2 + reward_3
+
+        event.state_hist['reward_1'].append(reward_1)
+        event.state_hist['reward_2'].append(reward_2)
+        event.state_hist['reward_3'].append(reward_3)
+        event.state_hist['tot_reward'].append(tot_reward)
+        return tot_reward
 
 
 class Vehicle:
@@ -158,6 +177,11 @@ class Vehicle:
         if self.event['next']['time'] > next_schd_time + SCHEDULE_TOLERANCE:
             route.inter_event['late'] += 1
         
+        ## update idle time tracker
+        idle_time = max(0, next_schd_time - finish_time)
+        route.idle_time['time'].append(time_now)
+        route.idle_time['idle_time'].append(idle_time)
+        
     
     def arrive_station(self, route):
         time_now = self.event['next']['time']
@@ -182,6 +206,9 @@ class Vehicle:
             self.event['next']['time'] = time_now + dwell_time
             self.event['next']['type'] = 'depart'
 
+        ## update route
+        stop_idx = self.event['next']['stop']
+        route.stops[self.direction][stop_idx].last_arrival_time.append(time_now)
     
     def depart_station(self, skip_flex=True):
         time_now = self.event['next']['time']
@@ -208,6 +235,8 @@ class Vehicle:
         
         self.event['next']['time'] = time_now + run_time
 
+
+
 class EventManager:
     def __init__(self) -> None:
         start_time = 0
@@ -216,6 +245,8 @@ class EventManager:
         self.done = 0
         self.requires_control = 0
         self.veh_idx = None
+        self.state_hist = {'time': [],'observation': [], 'action': [], 'tot_reward': [],
+                           'reward_1': [], 'reward_2': [], 'reward_3': []}
     
     def start_vehicles(self, route):
         for vehicle in route.vehicles:
@@ -227,6 +258,8 @@ class EventManager:
             for ky in route.inter_event:
                 route.inter_event[ky] = 0
 
+            ## update
+            self.state_hist['action'].append(action)
             ## perform event
             route.vehicles[self.veh_idx].depart_station(skip_flex=action)
             return self.step(route)
@@ -252,18 +285,26 @@ class EventManager:
         requires_control = check_control_conditions(route.vehicles[self.veh_idx], CONTROL_STOPS)
 
         if requires_control:
-            flex_stop_idx = route.vehicles[self.veh_idx].event['next']['stop'] + 1
+            stop_idx = route.vehicles[self.veh_idx].event['next']['stop']
+            direction = route.vehicles[self.veh_idx].direction
+            
+            flex_stop_idx = stop_idx + 1
             direction = route.vehicles[self.veh_idx].direction
             flex_stop = route.stops[direction][flex_stop_idx]
-            n_pax = len(flex_stop.active_pax)
+            n_flex_pax = len(flex_stop.active_pax)
 
             ## we will only request an action if there are flex route passengers waiting
-            if n_pax:
+            if n_flex_pax:
+                headway = route.stops[direction][stop_idx].last_arrival_time[-1] - route.stops[direction][stop_idx].last_arrival_time[-2]
+                load = len(route.vehicles[self.veh_idx].pax)
                 ## RETURN TUPLE ACCORDING TO GYM (OBSERVATION, REWARD, TERMINATED, TRUNCATED, INFO)
-                obs = [n_pax]
-                reward = sum([route.inter_event[ky] for ky in route.inter_event])
+                obs = [stop_idx, n_flex_pax, headway, load]
+                reward = route.get_reward(self)
                 terminated, truncated = 0, 0
                 info = route.inter_event
+
+                self.state_hist['observation'].append(obs)
+                self.state_hist['time'].append(time_now)
                 return obs, reward, terminated, truncated, info
             
         ## if no control required 
