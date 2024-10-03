@@ -143,6 +143,8 @@ class Vehicle:
         self.event_hist = {'direction': [], 'stop': [], 'arrival_time': [], 
                            'departure_time': [], 'load': [],
                            'boardings': [], 'alightings': []}
+        
+        self.departure_delay = 0
     
     def start(self, route):
         self.direction = 'out'
@@ -181,6 +183,9 @@ class Vehicle:
         idle_time = max(0, next_schd_time - finish_time)
         route.idle_time['time'].append(time_now)
         route.idle_time['idle_time'].append(idle_time)
+
+        ## update schedule delay
+        self.departure_delay = max(0, finish_time - next_schd_time)
         
     
     def arrive_station(self, route):
@@ -295,10 +300,12 @@ class EventManager:
 
             ## we will only request an action if there are flex route passengers waiting
             if n_flex_pax:
+                ## TODO: state trimming and introudce condition if enough buffer time has passed since start of episode
                 headway = route.stops[direction][stop_idx].last_arrival_time[-1] - route.stops[direction][stop_idx].last_arrival_time[-2]
                 load = len(route.vehicles[self.veh_idx].pax)
+                delay = round(route.vehicles[self.veh_idx].departure_delay / 60, 0)
                 ## RETURN TUPLE ACCORDING TO GYM (OBSERVATION, REWARD, TERMINATED, TRUNCATED, INFO)
-                obs = [stop_idx, n_flex_pax, headway, load]
+                obs = [stop_idx, n_flex_pax, headway, load, delay]
                 reward = route.get_reward(self)
                 terminated, truncated = 0, 0
                 info = route.inter_event

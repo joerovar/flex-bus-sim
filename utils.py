@@ -42,7 +42,7 @@ def tabulate_improvements(state, idle, pax, trips, base_scenario='DN', flex_stop
     return result_df, pct_change_df
 
 
-def plot_cumulative_idle_time(df):
+def plot_cumulative_idle_time(df, figsize=(4,3)):
     # Sort by time to ensure correct cumulative plotting within each scenario
     df = df.sort_values(by=['scenario', 'time'])
     
@@ -53,7 +53,7 @@ def plot_cumulative_idle_time(df):
     sns.set(style="whitegrid")
     
     # Create the plot with multiple scenarios
-    fig, axs = plt.subplots(figsize=(7, 5))
+    fig, axs = plt.subplots(figsize=figsize)
     
     # Plot time vs cumulative idle time with distribution for each scenario (hue=scenario)
     sns.lineplot(x='time', y='cumulative_idle_time', data=df, hue='scenario', ax=axs)

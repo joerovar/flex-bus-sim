@@ -74,6 +74,37 @@ if __name__ == '__main__':
         state_results.append(state_hist)
         idle_results.append(idle_hist)
 
+    ## SCENARIO FULLY GREEDY
+    for i in range(N_EPISODES):
+        SCENARIO = 'FG'
+        route = RouteManager()
+        event = EventManager()
+        event.start_vehicles(route)
+        route.load_all_pax()
+
+        obs, reward, terminated, truncated, info = event.step(route, action=None)
+        while not terminated:
+            n_pax = obs[1]
+            if n_pax:
+                obs, reward, terminated, truncated, info = event.step(route, action=False)   
+            else:
+                obs, reward, terminated, truncated, info = event.step(route, action=True)  
+
+        pax_hist = get_pax_hist(route, FLEX_STOPS)
+        veh_hist = get_veh_hist(route, FLEX_STOPS)
+        state_hist = pd.DataFrame(event.state_hist)
+        idle_hist = pd.DataFrame(route.idle_time)
+
+        for hist in (pax_hist, veh_hist, state_hist, idle_hist):
+            hist['scenario'] = SCENARIO
+            hist['episode'] = i
+
+        pax_results.append(pax_hist)
+        trip_results.append(veh_hist)
+        state_results.append(state_hist)
+        idle_results.append(idle_hist)
+
+
     ## SCENARIO SMART GREEDY
     for i in range(N_EPISODES):
         SCENARIO = 'SG'
@@ -85,7 +116,9 @@ if __name__ == '__main__':
         obs, reward, terminated, truncated, info = event.step(route, action=None)
         while not terminated:
             n_pax = obs[1]
-            if n_pax:
+            delay = obs[4]
+
+            if n_pax and delay < SG_MAX_DELAY:
                 obs, reward, terminated, truncated, info = event.step(route, action=False)   
             else:
                 obs, reward, terminated, truncated, info = event.step(route, action=True)  
