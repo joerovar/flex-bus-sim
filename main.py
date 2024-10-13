@@ -61,7 +61,7 @@ if __name__ == '__main__':
             obs, reward, terminated, truncated, info = event.step(route, action=True)
  
         pax_hist = get_pax_hist(route, FLEX_STOPS)
-        veh_hist = get_veh_hist(route, FLEX_STOPS)
+        veh_hist = get_vehicle_history(route, FLEX_STOPS)
         state_hist = pd.DataFrame(event.state_hist)
         idle_hist = pd.DataFrame(route.idle_time)
 
@@ -74,7 +74,7 @@ if __name__ == '__main__':
         state_results.append(state_hist)
         idle_results.append(idle_hist)
 
-    ## SCENARIO FULLY GREEDY
+    ## SCENARIO FULLY GREEDY: SERVE ALL PAX
     for i in range(N_EPISODES):
         SCENARIO = 'FG'
         route = RouteManager()
@@ -91,7 +91,7 @@ if __name__ == '__main__':
                 obs, reward, terminated, truncated, info = event.step(route, action=True)  
 
         pax_hist = get_pax_hist(route, FLEX_STOPS)
-        veh_hist = get_veh_hist(route, FLEX_STOPS)
+        veh_hist = get_vehicle_history(route, FLEX_STOPS)
         state_hist = pd.DataFrame(event.state_hist)
         idle_hist = pd.DataFrame(route.idle_time)
 
@@ -105,7 +105,7 @@ if __name__ == '__main__':
         idle_results.append(idle_hist)
 
 
-    ## SCENARIO SMART GREEDY
+    ## SCENARIO SMART GREEDY: SERVE ONLY IF THE SCHEDULE DELAY UPON DEPARTURE IS WIHTIN A THRESHOLD
     for i in range(N_EPISODES):
         SCENARIO = 'SG'
         route = RouteManager()
@@ -124,7 +124,7 @@ if __name__ == '__main__':
                 obs, reward, terminated, truncated, info = event.step(route, action=True)  
 
         pax_hist = get_pax_hist(route, FLEX_STOPS)
-        veh_hist = get_veh_hist(route, FLEX_STOPS)
+        veh_hist = get_vehicle_history(route, FLEX_STOPS)
         state_hist = pd.DataFrame(event.state_hist)
         idle_hist = pd.DataFrame(route.idle_time)
 
@@ -136,9 +136,6 @@ if __name__ == '__main__':
         trip_results.append(veh_hist)
         state_results.append(state_hist)
         idle_results.append(idle_hist)
-
-
-
 
 # Get the current date and time
 now = datetime.now()

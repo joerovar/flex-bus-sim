@@ -5,13 +5,16 @@ import pandas as pd
 # Change default DPI for all plots
 mpl.rcParams['figure.dpi'] = 150
 
-def tabulate_improvements(state, idle, pax, trips, base_scenario='DN', flex_stops=[]):
+def tabulate_improvements(state: pd.DataFrame, idle: pd.DataFrame, 
+                          pax: pd.DataFrame, trips: pd.DataFrame, 
+                          base_scenario: str = 'DN', flex_stops: list = []) -> tuple:
     # Group and aggregate results for each DataFrame
     n_lates = state.groupby(['scenario'])['reward_3'].sum()
     denied_riders = state.groupby(['scenario'])['reward_1'].sum()
     idle_sum = (idle.groupby(['scenario'])['idle_time'].sum()/60/60).round(2)
     wait_time_mean = pax.groupby(['scenario'])['wait_time'].mean().round(0)
-    headway_cv = (trips.groupby(['scenario'])['headway'].std() / trips.groupby(['scenario'])['headway'].mean()).round(3)
+    fixed_trip_stops = trips[~trips['stop'].isin(flex_stops)]
+    headway_cv = (fixed_trip_stops.groupby(['scenario'])['headway'].std() / fixed_trip_stops.groupby(['scenario'])['headway'].mean()).round(3)
     avg_load = trips.groupby(['scenario'])['load'].mean().round(2)
     n_fixed_pax = pax[~pax['origin'].isin(flex_stops)].groupby(['scenario']).size()
     n_flex_pax = pax[pax['origin'].isin(flex_stops)].groupby(['scenario']).size()

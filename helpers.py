@@ -153,9 +153,20 @@ def get_pax_hist(route, flex_stops):
     pax_df.loc[pax_df['origin'].isin(flex_stops), 'flex'] = 1
     return pax_df
 
-def get_veh_hist(route, flex_stops):
+def get_vehicle_history(vehicle_list, flex_stop_list):
+    """
+    Generates a DataFrame containing the event history of each vehicle.
+
+    Parameters:
+    - vehicle_list (list): A list of vehicle objects, each having an attribute 'event_hist'.
+    - flex_stop_list (list): A list of stops considered as flexible stops.
+
+    Returns:
+    - pd.DataFrame: A DataFrame containing the event history of all vehicles, 
+                    with additional columns for vehicle ID, headway, and flex stop indicator.
+    """
     veh_hist = []
-    for veh in route.vehicles:
+    for veh in vehicle_list:
         df = pd.DataFrame(veh.event_hist)
         df['veh_id'] = veh.idx
         veh_hist.append(df)
@@ -163,8 +174,13 @@ def get_veh_hist(route, flex_stops):
     veh_df['headway'] = veh_df.groupby(['direction', 'stop'])['arrival_time'].transform(lambda x: x.sort_values().diff())
 
     veh_df['flex'] = 0
-    veh_df.loc[veh_df['stop'].isin(flex_stops), 'flex'] = 1
+    veh_df.loc[veh_df['stop'].isin(flex_stop_list), 'flex'] = 1
     return veh_df
+
+def convert_duration_string_to_minutes(duration_str):
+    ## receive HHhMM string and convert to minutes
+    hours, minutes = duration_str.split('h')
+    return int(hours) * 60 + int(minutes)
 
 def pct_change(val_from, val_to, decimals=2):
     return round((val_to - val_from) / val_from, decimals)

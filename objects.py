@@ -19,13 +19,13 @@ class Stop:
         self.last_arrival_time = [-SCHEDULE_HEADWAY*60]
     
     def move_to_active_pax(self, time_now):
-        tmp_times = self.inactive_pax_arrival_times
-        any_pax_times = list(tmp_times[tmp_times <= time_now])
-        if len(any_pax_times):
-            for pax_time in any_pax_times:
-                dest = np.random.choice([i for i in range(self.idx+1, N_STOPS) if i not in FLEX_STOPS])
-                self.active_pax.append(Passenger(self.idx, dest, pax_time, self.direction))
-            self.inactive_pax_arrival_times = tmp_times[tmp_times>time_now]
+        for dest_idx in range(len(self.inactive_pax_arrival_times)):
+            tmp_times = np.array(self.inactive_pax_arrival_times[dest_idx])
+            any_pax_times = list(tmp_times[tmp_times <= time_now])
+            if len(any_pax_times):
+                for pax_time in any_pax_times:
+                    self.active_pax.append(Passenger(self.idx, dest_idx, pax_time, self.direction))
+                self.inactive_pax_arrival_times[dest_idx] = list(tmp_times[tmp_times>time_now])
 
     def remove_long_wait_pax(self, time_now):
         ## only flex pax
@@ -79,13 +79,15 @@ class RouteManager:
         for direction in self.stops:
             set_stops = self.stops[direction]
             for i in range(len(set_stops)-1):
-                if i == 0: ## terminal
-                    arr_rate = ARRIVAL_RATES['terminal']
-                if i in FLEX_STOPS:
-                    arr_rate = ARRIVAL_RATES['flex']
-                if i > 0 and i not in FLEX_STOPS:
-                    arr_rate = ARRIVAL_RATES['fixed']
-                self.stops[direction][i].inactive_pax_arrival_times = get_poisson_arrival_times(arr_rate, MAX_TIME_HOURS)
+                inter_arrival_times = []
+                for j in range(len(set_stops)):
+                    od_rate = OD_MATRIX[i][j]
+                    if od_rate > 0:
+                        arrival_times = list(get_poisson_arrival_times(od_rate, MAX_TIME_HOURS))
+                        inter_arrival_times.append(arrival_times)
+                    else:
+                        inter_arrival_times.append([])
+                self.stops[direction][i].inactive_pax_arrival_times = inter_arrival_times
     
     def get_active_pax(self, time_now):
         for direction in self.stops:
