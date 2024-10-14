@@ -16,12 +16,12 @@ def tabulate_improvements(state: pd.DataFrame, idle: pd.DataFrame,
     fixed_trip_stops = trips[~trips['stop'].isin(flex_stops)]
     headway_cv = (fixed_trip_stops.groupby(['scenario'])['headway'].std() / fixed_trip_stops.groupby(['scenario'])['headway'].mean()).round(3)
     avg_load = trips.groupby(['scenario'])['load'].mean().round(2)
-    n_fixed_pax = pax[~pax['origin'].isin(flex_stops)].groupby(['scenario']).size()
-    n_flex_pax = pax[pax['origin'].isin(flex_stops)].groupby(['scenario']).size()
-    n_tot_pax = pax.groupby(['scenario']).size()
+    n_fixed_pax = pax[(~pax['origin'].isin(flex_stops)) & (pax['boarding_time'].notna())].groupby(['scenario']).size()
+    n_flex_pax = pax[(pax['origin'].isin(flex_stops)) & (pax['boarding_time'].notna())].groupby(['scenario']).size()
+    n_tot_pax = pax[pax['boarding_time'].notna()].groupby(['scenario']).size()
     n_trips = trips[trips['stop']==0].groupby(['scenario']).size()
     trips['delay'] = trips['arrival_time'] - trips['scheduled_time']
-    average_delay_by_group = trips.groupby('scenario')['delay'].mean().round(0)
+    average_delay_by_group = trips[~trips['stop'].isin(flex_stops)].groupby('scenario')['delay'].mean().round(0)
     ## get mean delay where delay is the difference between arrival time and scheduled time 
     
 
@@ -39,7 +39,7 @@ def tabulate_improvements(state: pd.DataFrame, idle: pd.DataFrame,
         'n_trips': n_trips,
         'avg_delay': average_delay_by_group
     })
-    
+    result_df['otp'] = 100 - result_df['n_lates'] / result_df['n_trips'] * 100
     # Calculate percentage change from the base scenario
     pct_change_df = result_df.copy()
     for col in result_df.columns:
@@ -73,3 +73,7 @@ def plot_cumulative_idle_time(df, figsize=(4,3)):
     
     # Display the plot
     plt.show()
+
+
+def create_field_from_state_item(df, list_index, new_field_name):
+    df[new_field_name] = df['observation'].apply(lambda x: float(x.split(',')[list_index].strip('[]')))

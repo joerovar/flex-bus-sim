@@ -134,8 +134,7 @@ def lognormal_sample(stats):
     sigma = np.sqrt(np.log(1 + (std**2 / mean**2)))
     return round(np.random.lognormal(mu, sigma),0)
 
-
-def get_pax_hist(route, flex_stops):
+def get_pax_hist(route, flex_stops, include_denied=False):
     pax_hist = {'direction': [], 'origin': [], 'destination': [], 'arrival_time': [], 'boarding_time': [], 'alight_time': []}
 
     for pax in route.archived_pax:
@@ -145,6 +144,15 @@ def get_pax_hist(route, flex_stops):
         pax_hist['arrival_time'].append(pax.arrival_time)
         pax_hist['boarding_time'].append(pax.boarding_time)
         pax_hist['alight_time'].append(pax.alight_time)
+
+    if include_denied:
+        for pax in route.denied_flex_pax:
+            pax_hist['direction'].append(pax.direction)
+            pax_hist['origin'].append(pax.origin)
+            pax_hist['destination'].append(pax.destination)
+            pax_hist['arrival_time'].append(pax.arrival_time)
+            pax_hist['boarding_time'].append(np.nan)
+            pax_hist['alight_time'].append(np.nan)
 
     pax_df = pd.DataFrame(pax_hist)
     pax_df['wait_time'] = pax_df['boarding_time']-pax_df['arrival_time']
