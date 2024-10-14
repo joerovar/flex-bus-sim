@@ -47,8 +47,8 @@ idle_results = []
 if __name__ == '__main__':
     ## evaluation
     
-    ## SCENARIO DO NOTHING
-    SCENARIO = 'DN'
+    ## SCENARIO NEVER DEVIATE (ND)
+    SCENARIO = 'ND'
 
     for i in range(N_EPISODES):
         route = RouteManager()
@@ -74,9 +74,9 @@ if __name__ == '__main__':
         state_results.append(state_hist)
         idle_results.append(idle_hist)
 
-    ## SCENARIO FULLY GREEDY: SERVE ALL PAX
+    ## SCENARIO ALWAYS DEVIATE
     for i in range(N_EPISODES):
-        SCENARIO = 'FG'
+        SCENARIO = 'AD'
         route = RouteManager()
         event = EventManager()
         event.start_vehicles(route)
@@ -105,9 +105,9 @@ if __name__ == '__main__':
         idle_results.append(idle_hist)
 
 
-    ## SCENARIO SMART GREEDY: SERVE ONLY IF THE SCHEDULE DELAY UPON DEPARTURE IS WIHTIN A THRESHOLD
+    ## SCENARIO SELECTIVE DEVIATION: SERVE ONLY IF THE SCHEDULE DELAY UPON DEPARTURE IS WIHTIN A THRESHOLD
     for i in range(N_EPISODES):
-        SCENARIO = 'SG'
+        SCENARIO = 'SD'
         route = RouteManager()
         event = EventManager()
         event.start_vehicles(route)
