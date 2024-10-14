@@ -228,7 +228,7 @@ class Vehicle:
         stop_idx = self.event['next']['stop']
         route.stops[self.direction][stop_idx].last_arrival_time.append(time_now)
     
-    def depart_stop(self, skip_flex=True):
+    def depart_stop(self, deviate=0):
         time_now = self.event['next']['time']
 
         ## set destination
@@ -239,8 +239,8 @@ class Vehicle:
 
         stop = self.event['next']['stop']
 
-        if skip_flex and (stop in CONTROL_STOPS):
-            ## stop at 
+        if (not deviate) and (stop in CONTROL_STOPS):
+            ## advance to next fixed stop (two stops ahead)
             self.event['next']['stop'] += 2
         else:
             self.event['next']['stop'] += 1
@@ -281,7 +281,7 @@ class EventManager:
             ## update
             self.state_hist['action'].append(action)
             ## perform event
-            route.vehicles[self.veh_idx].depart_stop(skip_flex=action)
+            route.vehicles[self.veh_idx].depart_stop(deviate=action)
             return self.step(route)
         
         self.veh_idx = find_closest_vehicle(route.vehicles, self.timestamps[-1])

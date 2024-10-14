@@ -1,40 +1,7 @@
 from objects import RouteManager, EventManager
 from helpers import *
-import gymnasium as gym
-import numpy as np
-from gymnasium import spaces
 import os
 from datetime import datetime
-
-class CustomEnv(gym.Env):
-    """Custom Environment that follows gym interface."""
-
-    metadata = {"render_modes": ["human"], "render_fps": 30}
-
-    def __init__(self):
-        super().__init__()
-        # Define action and observation space
-        # They must be gym.spaces objects
-        # Example when using discrete actions:
-        self.action_space = spaces.Discrete(2)
-        # Example for using image as input (channel-first; channel-last also works):
-        self.observation_space = spaces.Box(low=np.array(LOW), high=np.array(HIGH),
-                                            shape=(STATE_DIM, ), dtype=np.uint8)
-
-    # def step(self, action):
-    #     ...
-    #     return observation, reward, terminated, truncated, info
-
-    # def reset(self, seed=None, options=None):
-    #     ...
-    #     return observation, info
-
-    # def render(self):
-    #     ...
-
-    # def close(self):
-    #     ...
-
 
 ## Experimental Design Parameters
 N_EPISODES = 20
@@ -58,7 +25,7 @@ if __name__ == '__main__':
 
         obs, reward, terminated, truncated, info = event.step(route, action=None)
         while not terminated:
-            obs, reward, terminated, truncated, info = event.step(route, action=True)
+            obs, reward, terminated, truncated, info = event.step(route, action=0) ## action 0 is to never deviate
  
         pax_hist= get_pax_hist(route, FLEX_STOPS, include_denied=True)
         veh_hist = get_vehicle_history(route.vehicles, FLEX_STOPS)
@@ -86,9 +53,9 @@ if __name__ == '__main__':
         while not terminated:
             n_pax = obs[1]
             if n_pax:
-                obs, reward, terminated, truncated, info = event.step(route, action=False)   
+                obs, reward, terminated, truncated, info = event.step(route, action=1) ## deviate   
             else:
-                obs, reward, terminated, truncated, info = event.step(route, action=True)  
+                obs, reward, terminated, truncated, info = event.step(route, action=0) ## do not deviate  
 
         pax_hist = get_pax_hist(route, FLEX_STOPS, include_denied=True)
         veh_hist = get_vehicle_history(route.vehicles, FLEX_STOPS)
@@ -119,9 +86,9 @@ if __name__ == '__main__':
             delay = obs[4]
 
             if n_pax and delay < SG_MAX_DELAY:
-                obs, reward, terminated, truncated, info = event.step(route, action=False)   
+                obs, reward, terminated, truncated, info = event.step(route, action=1)   
             else:
-                obs, reward, terminated, truncated, info = event.step(route, action=True)  
+                obs, reward, terminated, truncated, info = event.step(route, action=0)  
 
         pax_hist = get_pax_hist(route, FLEX_STOPS, include_denied=True)
         veh_hist = get_vehicle_history(route.vehicles, FLEX_STOPS)
