@@ -20,6 +20,10 @@ def tabulate_improvements(state: pd.DataFrame, idle: pd.DataFrame,
     n_flex_pax = pax[pax['origin'].isin(flex_stops)].groupby(['scenario']).size()
     n_tot_pax = pax.groupby(['scenario']).size()
     n_trips = trips[trips['stop']==0].groupby(['scenario']).size()
+    trips['delay'] = trips['arrival_time'] - trips['scheduled_time']
+    average_delay_by_group = trips.groupby('scenario')['delay'].mean().round(0)
+    ## get mean delay where delay is the difference between arrival time and scheduled time 
+    
 
     # Create a DataFrame with all the metrics
     result_df = pd.DataFrame({
@@ -32,7 +36,8 @@ def tabulate_improvements(state: pd.DataFrame, idle: pd.DataFrame,
         'fixed_ridership': n_fixed_pax,
         'flex_ridership': n_flex_pax,
         'tot_ridership': n_tot_pax,
-        'n_trips': n_trips
+        'n_trips': n_trips,
+        'avg_delay': average_delay_by_group
     })
     
     # Calculate percentage change from the base scenario

@@ -36,6 +36,9 @@ class Stop:
         for pax in long_wait_pax:
             self.active_pax.remove(pax)
         return long_wait_pax
+    
+    def get_latest_headway(self):
+        return self.last_arrival_time[-1] - self.last_arrival_time[-2]
 
 
 class Schedule:
@@ -44,6 +47,7 @@ class Schedule:
             'out': [i*SCHEDULE_HEADWAY*60 for i in range(N_TRIPS)],
             'in': [HALF_CYCLE_TIME*60 + i*SCHEDULE_HEADWAY*60 for i in range(N_TRIPS)]
         }
+        self.scheduled_stop_times = SCHEDULED_STOP_TIMES
 
 class RouteManager:
     def __init__(self) -> None:
@@ -100,6 +104,10 @@ class RouteManager:
                     self.inter_event['denied'] += len(denied_flex_pax)
 
                 self.stops[direction][i].move_to_active_pax(time_now)
+
+    def get_scheduled_time(self, stop_idx, trip_idx, direction):
+        schd_depart = self.schedule.deps[direction][trip_idx]
+        return schd_depart + self.schedule.scheduled_stop_times[stop_idx]
     
     def assign_next_trip(self, direction):
         ## update trip counter for next direction
@@ -108,13 +116,14 @@ class RouteManager:
         ## get next scheduled departure for the specified direction
         trip_idx = self.trip_counter[direction] - 1 ## minus 1 because departures index start from zero
         schd_time = self.schedule.deps[direction][trip_idx]
-        return schd_time
+        return schd_time, trip_idx
 
     def get_reward(self, event):
         reward_1 = self.inter_event['denied'] * REWARD_WEIGHTS['denied']
         
-        reward_2 = self.inter_event['fixed_wait_time'] / np.max([self.inter_event['fixed_boardings'], 1]) 
-        reward_2 *= REWARD_WEIGHTS['fixed_wait_time']
+        avg_wait_time = self.inter_event['fixed_wait_time'] / np.max([self.inter_event['fixed_boardings'], 1]) 
+        excess_wait_time = (avg_wait_time/60) - (SCHEDULE_HEADWAY/2)
+        reward_2 = max(0, round(excess_wait_time,0)*REWARD_WEIGHTS['fixed_wait_time'])
         
         reward_3 = self.inter_event['late'] * REWARD_WEIGHTS['late']
         
@@ -142,17 +151,18 @@ class Vehicle:
         }
 
         ## records
-        self.event_hist = {'direction': [], 'stop': [], 'arrival_time': [], 
+        self.event_hist = {'direction': [], 'trip_id': [], 'stop': [], 'arrival_time': [], 
                            'departure_time': [], 'load': [],
-                           'boardings': [], 'alightings': []}
-        
-        self.departure_delay = 0
+                           'boardings': [], 'alightings': [], 'scheduled_time': []}
+        self.trip_idx = None
     
     def start(self, route):
         self.direction = 'out'
 
         ## update route trip coutner and get the scheduled departure
-        next_schd_time = route.assign_next_trip(self.direction)
+        next_schd_time, trip_idx = route.assign_next_trip(self.direction)
+        self.trip_idx = trip_idx
+
         ## trip counter
         self.trip_counter[self.direction] += 1
 
@@ -166,7 +176,8 @@ class Vehicle:
         next_direction = 'in' if self.direction == 'out' else 'out'
         
         ## update route trip coutner and get the scheduled departure
-        next_schd_time = route.assign_next_trip(next_direction)
+        next_schd_time, trip_idx = route.assign_next_trip(next_direction)
+        self.trip_idx = trip_idx
 
         ## update vehicle trip counter
         self.trip_counter[next_direction] += 1
@@ -185,18 +196,18 @@ class Vehicle:
         idle_time = max(0, next_schd_time - finish_time)
         route.idle_time['time'].append(time_now)
         route.idle_time['idle_time'].append(idle_time)
-
-        ## update schedule delay
-        self.departure_delay = max(0, finish_time - next_schd_time)
         
     
-    def arrive_station(self, route):
+    def arrive_at_stop(self, route):
         time_now = self.event['next']['time']
         
         ## append records
+        self.event_hist['trip_id'].append(self.trip_idx)
         self.event_hist['direction'].append(self.direction)
         self.event_hist['stop'].append(self.event['next']['stop'])
         self.event_hist['arrival_time'].append(time_now)
+        self.event_hist['scheduled_time'].append(route.get_scheduled_time(self.event['next']['stop'], self.trip_idx, self.direction))
+
         
         ## process
         is_flex = self.event['next']['stop'] in FLEX_STOPS
@@ -217,7 +228,7 @@ class Vehicle:
         stop_idx = self.event['next']['stop']
         route.stops[self.direction][stop_idx].last_arrival_time.append(time_now)
     
-    def depart_station(self, skip_flex=True):
+    def depart_stop(self, skip_flex=True):
         time_now = self.event['next']['time']
 
         ## set destination
@@ -242,6 +253,8 @@ class Vehicle:
         
         self.event['next']['time'] = time_now + run_time
 
+    def get_latest_delay(self):
+        return self.event_hist['arrival_time'][-1] - self.event_hist['scheduled_time'][-1]
 
 
 class EventManager:
@@ -268,7 +281,7 @@ class EventManager:
             ## update
             self.state_hist['action'].append(action)
             ## perform event
-            route.vehicles[self.veh_idx].depart_station(skip_flex=action)
+            route.vehicles[self.veh_idx].depart_stop(skip_flex=action)
             return self.step(route)
         
         self.veh_idx = find_closest_vehicle(route.vehicles, self.timestamps[-1])
@@ -303,9 +316,10 @@ class EventManager:
             ## we will only request an action if there are flex route passengers waiting
             if n_flex_pax:
                 ## TODO: state trimming and introudce condition if enough buffer time has passed since start of episode
-                headway = route.stops[direction][stop_idx].last_arrival_time[-1] - route.stops[direction][stop_idx].last_arrival_time[-2]
+                headway = int(route.stops[direction][stop_idx].get_latest_headway()/60)
                 load = len(route.vehicles[self.veh_idx].pax)
-                delay = round(route.vehicles[self.veh_idx].departure_delay / 60, 0)
+                ## get the floor integer of the delay in minutes
+                delay = round(route.vehicles[self.veh_idx].get_latest_delay()/60)
                 ## RETURN TUPLE ACCORDING TO GYM (OBSERVATION, REWARD, TERMINATED, TRUNCATED, INFO)
                 obs = [stop_idx, n_flex_pax, headway, load, delay]
                 reward = route.get_reward(self)
@@ -318,10 +332,10 @@ class EventManager:
             
         ## if no control required 
         if route.vehicles[self.veh_idx].event['next']['type'] == 'arrive':
-            route.vehicles[self.veh_idx].arrive_station(route)
+            route.vehicles[self.veh_idx].arrive_at_stop(route)
             return self.step(route)
         
         if route.vehicles[self.veh_idx].event['next']['type'] == 'depart':
-            route.vehicles[self.veh_idx].depart_station()
+            route.vehicles[self.veh_idx].depart_stop()
             return self.step(route)
 

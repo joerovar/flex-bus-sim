@@ -61,7 +61,7 @@ if __name__ == '__main__':
             obs, reward, terminated, truncated, info = event.step(route, action=True)
  
         pax_hist = get_pax_hist(route, FLEX_STOPS)
-        veh_hist = get_vehicle_history(route, FLEX_STOPS)
+        veh_hist = get_vehicle_history(route.vehicles, FLEX_STOPS)
         state_hist = pd.DataFrame(event.state_hist)
         idle_hist = pd.DataFrame(route.idle_time)
 
@@ -91,7 +91,7 @@ if __name__ == '__main__':
                 obs, reward, terminated, truncated, info = event.step(route, action=True)  
 
         pax_hist = get_pax_hist(route, FLEX_STOPS)
-        veh_hist = get_vehicle_history(route, FLEX_STOPS)
+        veh_hist = get_vehicle_history(route.vehicles, FLEX_STOPS)
         state_hist = pd.DataFrame(event.state_hist)
         idle_hist = pd.DataFrame(route.idle_time)
 
@@ -124,7 +124,7 @@ if __name__ == '__main__':
                 obs, reward, terminated, truncated, info = event.step(route, action=True)  
 
         pax_hist = get_pax_hist(route, FLEX_STOPS)
-        veh_hist = get_vehicle_history(route, FLEX_STOPS)
+        veh_hist = get_vehicle_history(route.vehicles, FLEX_STOPS)
         state_hist = pd.DataFrame(event.state_hist)
         idle_hist = pd.DataFrame(route.idle_time)
 

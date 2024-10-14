@@ -14,14 +14,23 @@ CONTROL_STOPS = [i-1 for i in FLEX_STOPS]
 STATIC_DWELL = 5 # seconds
 DYNAMIC_DWELL = 2 # seconds
 SEGMENT_TIMES = {
-    'flex': {'mean': 85, 'std': 12},
-    'fixed': {'mean': 115, 'std': 25}
+    'flex': {'mean': 75, 'std': 15},
+    'fixed': {'mean': 120, 'std': 30}
 }
 
 ## service design
 SCHEDULE_HEADWAY = 10 ## minutes
 N_TRIPS = 100
 HALF_CYCLE_TIME = 10 ## minutes
+SCHEDULED_LINK_TIME = 120 ## seconds
+SCHEDULED_STOP_TIMES = [
+    0, 
+    150, 
+    225, ## flex - does not really matter
+    300, 
+    375, ## flex - does not really matter
+    450,
+    600]
 
 ## demand parameters
 OD_LOW = 3
