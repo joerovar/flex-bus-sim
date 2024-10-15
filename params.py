@@ -57,26 +57,39 @@ REMOVE_LONG_WAIT_FLEX = True
 SCHEDULE_TOLERANCE = 3
 
 ## State definition
-STATE_DIM = 3
+# Define the bounds for each state variable in the environment
 
-LOW = [
-    0, ## HEADWAY
-    0, ## Occupancy
-    0 ## Control stop
-]
-
-HIGH = [
-    3, # headway
-    3, # occupancy
-    2, # control stop
-]
-
+PARAM_BOUNDS = {
+    'stop_idx': [0, 6],  # Bins: [0-6]
+    
+    'n_flex_pax': {
+        'bins': [0, 1, 2],  # Bins: [0, 1, 2+]
+        'max_value': 2      # 2+ bin includes any value 2 or above
+    },
+    
+    'headway': {
+        'bins': [5, 10],    # Bins: [0-5, 5-10, 10+]
+        'max_value': 10     # 10+ bin includes any value greater than 10
+    },
+    
+    'load': {
+        'bins': [2],        # Bins: [0-2, 3+]
+        'max_value': 2      # 3+ bin includes any value greater than 2
+    },
+    
+    'delay': {
+        'bins': [1, 3],     # Bins: [<1, 1-3, 3+]
+        'max_value': 3      # 3+ bin includes any value greater than 3
+    }
+}
 
 REWARD_WEIGHTS = {
     'denied': 1,
     'fixed_wait_time': 1,
     'late': 1
 }
+
+
 
 ## SMART GREEDY PARAMETERS
 SG_MAX_DELAY = 1

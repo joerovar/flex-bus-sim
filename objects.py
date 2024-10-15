@@ -155,6 +155,7 @@ class Vehicle:
                            'departure_time': [], 'load': [],
                            'boardings': [], 'alightings': [], 'scheduled_time': []}
         self.trip_idx = None
+        self.state_hist = {'time': [], 'observation': [], 'action': [], 'tot_reward': []}
     
     def start(self, route):
         self.direction = 'out'
@@ -258,7 +259,7 @@ class Vehicle:
 
 
 class EventManager:
-    def __init__(self) -> None:
+    def __init__(self, agents='independent') -> None:
         start_time = 0
         self.timestamps = [start_time]
 
@@ -267,6 +268,7 @@ class EventManager:
         self.veh_idx = None
         self.state_hist = {'time': [],'observation': [], 'action': [], 'tot_reward': [],
                            'reward_1': [], 'reward_2': [], 'reward_3': []}
+        self.agents = agents
     
     def start_vehicles(self, route):
         for vehicle in route.vehicles:
@@ -302,6 +304,7 @@ class EventManager:
         ## get all passengers up to the current time
         route.get_active_pax(time_now)
 
+        ## check control
         requires_control = check_control_conditions(route.vehicles[self.veh_idx], CONTROL_STOPS)
 
         if requires_control:
@@ -326,10 +329,16 @@ class EventManager:
                 terminated, truncated = 0, 0
                 info = route.inter_event
 
+                ## bookkeeping
                 self.state_hist['observation'].append(obs)
                 self.state_hist['time'].append(time_now)
+
+                vehicle_state_hist = route.vehicles[self.veh_idx].state_hist
+                if len(vehicle_state_hist['observation']):
+                    ## update the reward for the vehicle
+                    pass
                 return obs, reward, terminated, truncated, info
-            
+                
         ## if no control required 
         if route.vehicles[self.veh_idx].event['next']['type'] == 'arrive':
             route.vehicles[self.veh_idx].arrive_at_stop(route)

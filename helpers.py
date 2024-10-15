@@ -192,3 +192,32 @@ def convert_duration_string_to_minutes(duration_str):
 
 def pct_change(val_from, val_to, decimals=2):
     return round((val_to - val_from) / val_from, decimals)
+
+def get_bin_index(state_name, actual_value):
+    """
+    Maps an actual value for a state variable to its corresponding bin index.
+
+    Parameters:
+    - state_name: The name of the state variable (e.g., 'n_flex_pax', 'headway', 'load', 'delay')
+    - actual_value: The actual value of the state variable
+
+    Returns:
+    - The index of the bin that the actual value falls into
+    """
+    bounds = PARAM_BOUNDS[state_name]
+
+    # If bounds is a list, it's directly indexed (for stop_idx)
+    if isinstance(bounds, list):
+        return min(max(0, actual_value), bounds[1])
+
+    # For others, the bounds are defined as bins with maximum values
+    for i, bound in enumerate(bounds['bins']):
+        if actual_value < bound:
+            return i
+
+    # If the value exceeds all bounds, return the last bin
+    return len(bounds['bins'])
+
+# Example usage:
+# To get the bin index for 'headway' with an actual value of 7:
+# bin_index = get_bin_index('headway', 7)   # Returns 1, because 7 falls into the 5-10 range
