@@ -14,15 +14,14 @@ CONTROL_STOPS = [i-1 for i in FLEX_STOPS]
 STATIC_DWELL = 5 # seconds
 DYNAMIC_DWELL = 2 # seconds
 SEGMENT_TIMES = {
-    'flex': {'mean': 75, 'std': 15},
-    'fixed': {'mean': 120, 'std': 30}
+    'flex': {'mean': 80, 'std': 20},
+    'fixed': {'mean': 125, 'std': 30}
 }
 
 ## service design
 SCHEDULE_HEADWAY = 10 ## minutes
 N_TRIPS = 100
 HALF_CYCLE_TIME = 10 ## minutes
-SCHEDULED_LINK_TIME = 120 ## seconds
 SCHEDULED_STOP_TIMES = [
     0, 
     150, 
@@ -59,40 +58,76 @@ SCHEDULE_TOLERANCE = 3
 ## State definition
 # Define the bounds for each state variable in the environment
 
-PARAM_BOUNDS = {
-    'stop_idx': [0, 6],  # Bins: [0-6]
-    
-    'n_flex_pax': {
-        'bins': [0, 1, 2],  # Bins: [0, 1, 2+]
-        'max_value': 2      # 2+ bin includes any value 2 or above
-    },
-    
-    'headway': {
-        'bins': [5, 10],    # Bins: [0-5, 5-10, 10+]
-        'max_value': 10     # 10+ bin includes any value greater than 10
-    },
-    
-    'load': {
-        'bins': [2],        # Bins: [0-2, 3+]
-        'max_value': 2      # 3+ bin includes any value greater than 2
-    },
-    
-    'delay': {
-        'bins': [1, 3],     # Bins: [<1, 1-3, 3+]
-        'max_value': 3      # 3+ bin includes any value greater than 3
-    }
-}
-
 REWARD_WEIGHTS = {
     'denied': 1,
     'fixed_wait_time': 1,
     'late': 1
 }
 
+## SELECTIVE DEVIATION PARAMETERS
+DELAY_THRESHOLD = 60
 
-
-## SMART GREEDY PARAMETERS
-SG_MAX_DELAY = 1
+## DYNAMIC SMART GREEDY PARAMETERS
+## define list where each item is the (max_delay, pax_threshold)
+MIN_PAX_THRESHOLDS = [(0, 1), (120, 2), (240, 4) ,(1000, 5)]
 
 ## PATHS FOR OUTPUT
 OUTPUT_FOLDER_PATH = 'outputs/'
+
+# PARAM_BOUNDS = {
+#     'stop_idx': {
+#         'bins': [3],
+#         'max_value': 3
+#     },  
+    
+#     'n_flex_pax': {
+#         'bins': [0, 1, 2],  # Bins: [0, 1, 2+]
+#         'max_value': 2      # 2+ bin includes any value 2 or above
+#     },
+    
+#     'headway': {
+#         'bins': [5, 10],    # Bins: [0-5, 5-10, 10+]
+#         'max_value': 10     # 10+ bin includes any value greater than 10
+#     },
+    
+#     'load': {
+#         'bins': [3],        # Bins: [0-3, 3+]
+#         'max_value': 2      # 3+ bin includes any value greater than 2
+#     },
+    
+#     'delay': {
+#         'bins': [1, 2, 3],     # Bins: [<1, 1-3, 3+]
+#         'max_value': 3      # 3+ bin includes any value greater than 3
+#     }
+# }
+
+# def get_bin_index(actual_value, bounds):
+#     # If bounds is a list, it's directly indexed (for stop_idx)
+#     if isinstance(bounds, list):
+#         return min(max(0, actual_value), bounds[1])
+
+#     # For others, the bounds are defined as bins with maximum values
+#     for i, bound in enumerate(bounds['bins']):
+#         if actual_value <= bound:
+#             return i
+
+#     # If the value exceeds all bounds, return the last bin
+#     return len(bounds['bins'])
+
+
+# def get_binned_state(actual_state: list):
+#     """
+#     Maps the actual values in the state 
+
+#     Parameters:
+#     - actual_state: The list of actual values of the state variable
+
+#     Returns:
+#     - binned_state: The list of bin indices for each state variable
+#     """
+
+#     binned_state = []
+#     for i, state_name in enumerate(STATE_KEYS):
+#         bounds = PARAM_BOUNDS[state_name]
+#         binned_state.append(get_bin_index(actual_state[i], bounds))
+#     return binned_state

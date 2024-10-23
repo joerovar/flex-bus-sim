@@ -16,7 +16,7 @@ class Stop:
         self.active_pax = []
         self.inactive_pax_arrival_times = np.array([]) ## to easily filter
         self.direction = direction
-        self.last_arrival_time = [-SCHEDULE_HEADWAY*60]
+        self.last_arrival_time = []
     
     def move_to_active_pax(self, time_now):
         for dest_idx in range(len(self.inactive_pax_arrival_times)):
@@ -38,6 +38,7 @@ class Stop:
         return long_wait_pax
     
     def get_latest_headway(self):
+        # print(self.last_arrival_time)
         return self.last_arrival_time[-1] - self.last_arrival_time[-2]
 
 
@@ -75,8 +76,9 @@ class RouteManager:
         self.inter_event = {
             'denied': 0,
             'fixed_wait_time': 0,
-            'late': 0,
-            'fixed_boardings': 0
+            'fixed_boardings': 0,
+            'on_time_trips': 0,
+            'total_trips': 0
         }
 
     def load_all_pax(self):
@@ -118,23 +120,37 @@ class RouteManager:
         schd_time = self.schedule.deps[direction][trip_idx]
         return schd_time, trip_idx
 
-    def get_reward(self, event):
-        reward_1 = self.inter_event['denied'] * REWARD_WEIGHTS['denied']
-        
+    def get_excess_wait_time(self):
         avg_wait_time = self.inter_event['fixed_wait_time'] / np.max([self.inter_event['fixed_boardings'], 1]) 
         excess_wait_time = (avg_wait_time/60) - (SCHEDULE_HEADWAY/2)
-        reward_2 = max(0, round(excess_wait_time,0)*REWARD_WEIGHTS['fixed_wait_time'])
-        
-        reward_3 = self.inter_event['late'] * REWARD_WEIGHTS['late']
-        
-        tot_reward = reward_1 + reward_2 + reward_3
+        excess_wait_time = max(0, excess_wait_time)
+        return excess_wait_time
 
-        event.state_hist['reward_1'].append(reward_1)
-        event.state_hist['reward_2'].append(reward_2)
-        event.state_hist['reward_3'].append(reward_3)
+    def get_reward(self, event):
+        ## reward 1: denied passengers
+
+        reward_1 = - self.inter_event['denied'] * REWARD_WEIGHTS['denied']
+        
+        ## reward 2: fixed wait time
+        excess_wait_time = self.get_excess_wait_time()
+        reward_2 = excess_wait_time * REWARD_WEIGHTS['fixed_wait_time']
+        
+        ## reward 3: on-time performance
+        if self.inter_event['total_trips'] > 0:
+            on_time_rate = self.inter_event['on_time_trips'] / self.inter_event['total_trips']
+        else:
+            on_time_rate = 0
+        reward_3 = on_time_rate * REWARD_WEIGHTS['late']
+        
+        tot_reward = np.float32(reward_1 + reward_3)
+        rewards = [reward_1, reward_2, reward_3]
+
+        event.state_hist['rewards'].append(rewards)
         event.state_hist['tot_reward'].append(tot_reward)
         return tot_reward
-
+    
+    def get_n_waiting_pax(self, stop_idx, direction):
+        return len(self.stops[direction][stop_idx].active_pax)
 
 class Vehicle:
     def __init__(self, idx):
@@ -189,9 +205,12 @@ class Vehicle:
         self.event['next']['stop'] = 0
         self.direction = next_direction
 
-        ## update the late arrivals counter
-        if self.event['next']['time'] > next_schd_time + SCHEDULE_TOLERANCE:
-            route.inter_event['late'] += 1
+        ## update the on-time arrivals counter
+        if self.event['next']['time'] <= next_schd_time + SCHEDULE_TOLERANCE:
+            route.inter_event['on_time_trips'] += 1
+
+        ## update the total trips
+        route.inter_event['total_trips'] += 1
         
         ## update idle time tracker
         idle_time = max(0, next_schd_time - finish_time)
@@ -227,7 +246,9 @@ class Vehicle:
 
         ## update route
         stop_idx = self.event['next']['stop']
+    
         route.stops[self.direction][stop_idx].last_arrival_time.append(time_now)
+        # print(f"Vehicle {self.idx} arrived at stop {stop_idx} in direction {self.direction} at {time_now}")
     
     def depart_stop(self, deviate=0):
         time_now = self.event['next']['time']
@@ -256,6 +277,9 @@ class Vehicle:
 
     def get_latest_delay(self):
         return self.event_hist['arrival_time'][-1] - self.event_hist['scheduled_time'][-1]
+    
+    def get_location(self):
+        return self.event['next']['stop'], self.direction
 
 
 class EventManager:
@@ -266,20 +290,18 @@ class EventManager:
         self.done = 0
         self.requires_control = 0
         self.veh_idx = None
-        self.state_hist = {'time': [],'observation': [], 'action': [], 'tot_reward': [],
-                           'reward_1': [], 'reward_2': [], 'reward_3': []}
+        self.state_hist = {'time': [],'observation': [], 'action': [], 'tot_reward': [], 'rewards': []}
         self.agents = agents
     
     def start_vehicles(self, route):
         for vehicle in route.vehicles:
             vehicle.start(route)
+    
+    def get_global_tuple():
+        pass
 
     def step(self, route, action=None):
         if (action is not None) and (self.veh_idx is not None):
-            ## reset counters
-            for ky in route.inter_event:
-                route.inter_event[ky] = 0
-
             ## update
             self.state_hist['action'].append(action)
             ## perform event
@@ -295,49 +317,79 @@ class EventManager:
         
         if time_now > MAX_TIME_HOURS*60*60:
             ## RETURN TUPLE ACCORDING TO GYM (OBSERVATION, REWARD, TERMINATED, TRUNCATED, INFO)
-            obs = []
+            observation = []
             reward = None
             terminated, truncated = 1, 1
             info = {}
-            return obs, reward, terminated, truncated, info
+            ## remove the last item of the state history
+            for ky in ('time', 'observation', 'action'):
+                self.state_hist[ky].pop(-1)
+            return observation, reward, terminated, truncated, info
         
         ## get all passengers up to the current time
         route.get_active_pax(time_now)
 
         ## check control
-        requires_control = check_control_conditions(route.vehicles[self.veh_idx], CONTROL_STOPS)
+        observation = get_observation(
+            route.vehicles[self.veh_idx], route, CONTROL_STOPS)
 
-        if requires_control:
-            stop_idx = route.vehicles[self.veh_idx].event['next']['stop']
-            direction = route.vehicles[self.veh_idx].direction
+        if observation is not None:
+            # stop_idx = route.vehicles[self.veh_idx].event['next']['stop']
+            # direction = route.vehicles[self.veh_idx].direction
             
-            flex_stop_idx = stop_idx + 1
-            direction = route.vehicles[self.veh_idx].direction
-            flex_stop = route.stops[direction][flex_stop_idx]
-            n_flex_pax = len(flex_stop.active_pax)
+            # flex_stop_idx = stop_idx + 1
+            # flex_stop = route.stops[direction][flex_stop_idx]
+            # n_flex_pax = len(flex_stop.active_pax)
 
-            ## we will only request an action if there are flex route passengers waiting
-            if n_flex_pax:
-                ## TODO: state trimming and introudce condition if enough buffer time has passed since start of episode
-                headway = int(route.stops[direction][stop_idx].get_latest_headway()/60)
-                load = len(route.vehicles[self.veh_idx].pax)
-                ## get the floor integer of the delay in minutes
-                delay = round(route.vehicles[self.veh_idx].get_latest_delay()/60)
-                ## RETURN TUPLE ACCORDING TO GYM (OBSERVATION, REWARD, TERMINATED, TRUNCATED, INFO)
-                obs = [stop_idx, n_flex_pax, headway, load, delay]
+            # ## we will only request an action if there are flex route passengers waiting
+            # if n_flex_pax:
+            #     ## TODO: state trimming and introduce condition if enough buffer time has passed since start of episode
+            #     headway = route.stops[direction][stop_idx].get_latest_headway()/60
+            #     if np.isnan(headway):
+            #         pass
+            #     else:
+            # load = len(route.vehicles[self.veh_idx].pax)
+            # ## get the floor integer of the delay in minutes
+            # delay = round(route.vehicles[self.veh_idx].get_latest_delay(), 1)
+            ## RETURN TUPLE ACCORDING TO GYM (OBSERVATION, REWARD, TERMINATED, TRUNCATED, INFO)
+            # obs = [
+            #     np.int32(stop_idx), 
+            #     np.int32(n_flex_pax), 
+            #     np.float32(headway), 
+            #     np.int32(load), 
+            #     np.float32(delay)]
+            
+            terminated, truncated = 0, 0
+
+            ## reward
+            if self.state_hist['observation']:
                 reward = route.get_reward(self)
-                terminated, truncated = 0, 0
-                info = route.inter_event
+            else:
+                reward = np.nan
 
-                ## bookkeeping
-                self.state_hist['observation'].append(obs)
-                self.state_hist['time'].append(time_now)
+            info = route.inter_event.copy()
+            ## add time
+            info['time'] = time_now
+            ## time passed since last event
+            if self.state_hist['observation']:
+                info['time_passed'] = time_now - self.state_hist['time'][-1]
+            else:
+                info['time_passed'] = np.nan
+            ## vehicle index
+            info['veh_idx'] = self.veh_idx
+            info['direction'] = route.vehicles[self.veh_idx].direction
+            ## reset counters after using it for reward and info
+            for ky in route.inter_event:
+                route.inter_event[ky] = 0
+            ## bookkeeping
+            self.state_hist['observation'].append(observation)
+            self.state_hist['time'].append(time_now)
 
-                vehicle_state_hist = route.vehicles[self.veh_idx].state_hist
-                if len(vehicle_state_hist['observation']):
-                    ## update the reward for the vehicle
-                    pass
-                return obs, reward, terminated, truncated, info
+            vehicle_state_hist = route.vehicles[self.veh_idx].state_hist
+            if len(vehicle_state_hist['observation']):
+                ## update the reward for the vehicle
+                pass
+            return observation, reward, terminated, truncated, info
                 
         ## if no control required 
         if route.vehicles[self.veh_idx].event['next']['type'] == 'arrive':

@@ -2,6 +2,7 @@ import matplotlib as mpl
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
+
 # Change default DPI for all plots
 mpl.rcParams['figure.dpi'] = 150
 
@@ -9,8 +10,9 @@ def tabulate_improvements(state: pd.DataFrame, idle: pd.DataFrame,
                           pax: pd.DataFrame, trips: pd.DataFrame, 
                           base_scenario: str = 'DN', flex_stops: list = []) -> tuple:
     # Group and aggregate results for each DataFrame
-    n_lates = state.groupby(['scenario'])['reward_3'].sum()
-    denied_riders = state.groupby(['scenario'])['reward_1'].sum()
+    # n_lates = state.groupby(['scenario'])['reward_3'].sum()
+    # denied_riders = state.groupby(['scenario'])['reward_1'].sum()
+    n_denied = pax[pax['boarding_time'].isna()].groupby(['scenario']).size()
     idle_sum = (idle.groupby(['scenario'])['idle_time'].sum()/60/60).round(2)
     wait_time_mean = pax.groupby(['scenario'])['wait_time'].mean().round(0)
     fixed_trip_stops = trips[~trips['stop'].isin(flex_stops)]
@@ -27,19 +29,21 @@ def tabulate_improvements(state: pd.DataFrame, idle: pd.DataFrame,
 
     # Create a DataFrame with all the metrics
     result_df = pd.DataFrame({
-        'n_lates': n_lates,
+        # 'n_lates': n_lates,
         'idle_time': idle_sum,
         'wait_time': wait_time_mean,
         'headway_cv': headway_cv,
         'load': avg_load,
-        'denied_riders': denied_riders,
+        'n_denied_riders': n_denied,
         'fixed_ridership': n_fixed_pax,
         'flex_ridership': n_flex_pax,
         'tot_ridership': n_tot_pax,
         'n_trips': n_trips,
         'avg_delay': average_delay_by_group
     })
-    result_df['otp'] = 100 - result_df['n_lates'] / result_df['n_trips'] * 100
+    # result_df['otp'] = 100 - result_df['n_lates'] / result_df['n_trips'] * 100
+    result_df['served_rate'] = 100 - result_df['n_denied_riders'] / (result_df['n_denied_riders']+result_df['flex_ridership']) * 100
+    result_df['served_rate'] = result_df['served_rate'].round(2)
     # Calculate percentage change from the base scenario
     pct_change_df = result_df.copy()
     for col in result_df.columns:

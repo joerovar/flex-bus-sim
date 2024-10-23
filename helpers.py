@@ -1,6 +1,7 @@
 import pandas as pd
 from params import *
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def get_poisson_arrival_times(arrival_rate, total_time):
@@ -122,10 +123,31 @@ def pax_activity(vehicle, route, static_dwell, dynamic_dwell, time_now, is_flex)
         route.inter_event['fixed_boardings'] += boardings
     return dwell_time
 
-def check_control_conditions(vehicle, control_stops):
-    is_in_control_stop = vehicle.event['next']['stop'] in control_stops
+def get_observation(vehicle: object, route: object, control_stops: list):
+    ## get stop, direction, and next flex stop of vehicle
+    stop_idx, direction = vehicle.get_location()
+    if stop_idx not in control_stops:
+        return None
+    flex_stop_idx = stop_idx + 1
+    stop = route.stops[direction][stop_idx]
+    flex_stop = route.stops[direction][flex_stop_idx]
+    n_flex_pax = route.get_n_waiting_pax(flex_stop_idx, direction)
+
+    ## check conditions
     is_departing = vehicle.event['next']['type'] == 'depart'
-    return (is_in_control_stop and is_departing)
+    flex_pax_waiting = len(flex_stop.active_pax) > 0
+    not_first_arrival = len(stop.last_arrival_time) > 1
+
+    if is_departing and flex_pax_waiting and not_first_arrival:
+        observation = [
+            np.int32(stop_idx), 
+            np.int32(n_flex_pax), 
+            np.int32(len(vehicle.pax)), 
+            np.float32(stop.get_latest_headway()), 
+            np.float32(vehicle.get_latest_delay())
+        ]
+        return observation
+    return None
 
 def lognormal_sample(stats):
     mean = stats['mean']
@@ -193,30 +215,25 @@ def convert_duration_string_to_minutes(duration_str):
 def pct_change(val_from, val_to, decimals=2):
     return round((val_to - val_from) / val_from, decimals)
 
-def get_bin_index(state_name, actual_value):
-    """
-    Maps an actual value for a state variable to its corresponding bin index.
-
-    Parameters:
-    - state_name: The name of the state variable (e.g., 'n_flex_pax', 'headway', 'load', 'delay')
-    - actual_value: The actual value of the state variable
-
-    Returns:
-    - The index of the bin that the actual value falls into
-    """
-    bounds = PARAM_BOUNDS[state_name]
-
-    # If bounds is a list, it's directly indexed (for stop_idx)
-    if isinstance(bounds, list):
-        return min(max(0, actual_value), bounds[1])
-
-    # For others, the bounds are defined as bins with maximum values
-    for i, bound in enumerate(bounds['bins']):
-        if actual_value < bound:
-            return i
-
-    # If the value exceeds all bounds, return the last bin
-    return len(bounds['bins'])
+def get_min_pax_threshold(delay):
+    if delay < MIN_PAX_THRESHOLDS[0][0]:
+        return MIN_PAX_THRESHOLDS[0][1]
+    elif delay < MIN_PAX_THRESHOLDS[1][0]:
+        return MIN_PAX_THRESHOLDS[1][1]
+    elif delay < MIN_PAX_THRESHOLDS[2][0]:
+        return MIN_PAX_THRESHOLDS[2][1]
+    else:
+        return MIN_PAX_THRESHOLDS[3][1]
+    
+def plot_min_pax_threshold():
+    fig, axs = plt.subplots(figsize=(4, 3))
+    delays = np.arange(0, 10, 0.1)
+    thresholds = [get_min_pax_threshold(delay) for delay in delays]
+    axs.plot(delays, thresholds)
+    axs.set_xlabel('Delay (minutes)')
+    axs.set_ylabel('Minimum Pax Threshold')
+    axs.set_title('Minimum Pax Threshold vs. Delay')
+    plt.show()
 
 # Example usage:
 # To get the bin index for 'headway' with an actual value of 7:

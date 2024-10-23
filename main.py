@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 
 ## Experimental Design Parameters
-N_EPISODES = 20
+N_EPISODES = 25
 
 pax_results = []
 trip_results = []
@@ -27,7 +27,7 @@ if __name__ == '__main__':
         while not terminated:
             obs, reward, terminated, truncated, info = event.step(route, action=0) ## action 0 is to never deviate
  
-        pax_hist= get_pax_hist(route, FLEX_STOPS, include_denied=True)
+        pax_hist = get_pax_hist(route, FLEX_STOPS, include_denied=True)
         veh_hist = get_vehicle_history(route.vehicles, FLEX_STOPS)
         state_hist = pd.DataFrame(event.state_hist)
         idle_hist = pd.DataFrame(route.idle_time)
@@ -71,6 +71,33 @@ if __name__ == '__main__':
         state_results.append(state_hist)
         idle_results.append(idle_hist)
 
+    ## SCENARIO RANDOM ACTION
+    for i in range(N_EPISODES):
+        SCENARIO = 'RA'
+        route = RouteManager()
+        event = EventManager()
+        event.start_vehicles(route)
+        route.load_all_pax()
+
+        obs, reward, terminated, truncated, info = event.step(route, action=None)
+        while not terminated:
+            n_pax = obs[1]
+            action = np.random.choice([0,1])
+            obs, reward, terminated, truncated, info = event.step(route, action=action)   
+
+        pax_hist = get_pax_hist(route, FLEX_STOPS, include_denied=True)
+        veh_hist = get_vehicle_history(route.vehicles, FLEX_STOPS)
+        state_hist = pd.DataFrame(event.state_hist)
+        idle_hist = pd.DataFrame(route.idle_time)
+
+        for hist in (pax_hist, veh_hist, state_hist, idle_hist):
+            hist['scenario'] = SCENARIO
+            hist['episode'] = i
+
+        pax_results.append(pax_hist)
+        trip_results.append(veh_hist)
+        state_results.append(state_hist)
+        idle_results.append(idle_hist)
 
     ## SCENARIO SELECTIVE DEVIATION: SERVE ONLY IF THE SCHEDULE DELAY UPON DEPARTURE IS WIHTIN A THRESHOLD
     for i in range(N_EPISODES):
@@ -82,10 +109,9 @@ if __name__ == '__main__':
 
         obs, reward, terminated, truncated, info = event.step(route, action=None)
         while not terminated:
-            n_pax = obs[1]
             delay = obs[4]
 
-            if n_pax and delay < SG_MAX_DELAY:
+            if delay < DELAY_THRESHOLD:
                 obs, reward, terminated, truncated, info = event.step(route, action=1)   
             else:
                 obs, reward, terminated, truncated, info = event.step(route, action=0)  
@@ -103,6 +129,40 @@ if __name__ == '__main__':
         trip_results.append(veh_hist)
         state_results.append(state_hist)
         idle_results.append(idle_hist)
+    
+    ## SCENARIO DYNAMIC SELECTIVE DEVIATION: SERVE ONLY IF THE SCHEDULE DELAY UPON DEPARTURE IS WIHTIN A THRESHOLD
+    for i in range(N_EPISODES):
+        SCENARIO = 'DSD'
+        route = RouteManager()
+        event = EventManager()
+        event.start_vehicles(route)
+        route.load_all_pax()
+
+        obs, reward, terminated, truncated, info = event.step(route, action=None)
+        while not terminated:
+            n_pax = obs[1]
+            delay = obs[4]
+            
+            min_pax = get_min_pax_threshold(delay)
+            if n_pax >= min_pax:
+                obs, reward, terminated, truncated, info = event.step(route, action=1)
+            else:
+                obs, reward, terminated, truncated, info = event.step(route, action=0)
+
+        pax_hist = get_pax_hist(route, FLEX_STOPS, include_denied=True)
+        veh_hist = get_vehicle_history(route.vehicles, FLEX_STOPS)
+        state_hist = pd.DataFrame(event.state_hist)
+        idle_hist = pd.DataFrame(route.idle_time)
+
+        for hist in (pax_hist, veh_hist, state_hist, idle_hist):
+            hist['scenario'] = SCENARIO
+            hist['episode'] = i
+
+        pax_results.append(pax_hist)
+        trip_results.append(veh_hist)
+        state_results.append(state_hist)
+        idle_results.append(idle_hist)
+
 
 # Get the current date and time
 now = datetime.now()
@@ -117,7 +177,6 @@ folder_path = os.path.join(OUTPUT_FOLDER_PATH, folder_name)
 os.mkdir(folder_path)
 
 print(f"Folder created: {folder_path}")
-
 
 # Save the concatenated DataFrames to CSV files using os.path.join for the file paths
 pax_results_df = pd.concat(pax_results)
