@@ -3,50 +3,7 @@ from params import *
 import numpy as np
 import matplotlib.pyplot as plt
 
-
-# def get_poisson_arrival_times(arrival_rate, total_time):
-#     """
-#     Given an arrival rate and a time interval, returns the times of arrival 
-#     based on an exponential distribution.
-    
-#     Parameters:
-#     - arrival_rate (float): The average arrival rate (arrivals per hour).
-#     - total_time (float): Time in hours.
-    
-#     Returns:
-#     - list: A list of arrival times (in seconds) during the time interval.
-#     """
-    
-#     # Convert arrival rate to per second (arrival_rate per hour -> per second)
-#     arrival_rate_per_sec = arrival_rate / 3600  # 3600 seconds in an hour
-    
-#     # Convert total time from hours to seconds
-#     total_time_sec = total_time * 3600
-    
-#     # Generate Poisson-distributed number of arrivals
-#     expected_arrivals = arrival_rate_per_sec * total_time_sec
-#     num_arrivals = np.random.poisson(expected_arrivals)
-    
-#     # Generate inter-arrival times using the exponential distribution (in seconds)
-#     inter_arrival_times = np.random.exponential(1 / arrival_rate_per_sec, num_arrivals)
-    
-#     # Cumulatively sum to get the actual arrival times
-#     arrival_times = np.cumsum(inter_arrival_times)
-
-#     arrival_times_within_window = arrival_times[arrival_times <= total_time_sec].round()
-
-#     ## debugging statements
-#     # print(arrival_rate)
-#     # print(total_time)
-#     # print(expected_arrivals)
-#     # print(arrival_times.max())
-#     # print(arrival_times_within_window.max())
-#     # print(arrival_times_within_window.shape)
-
-#     # Filter out arrival times that exceed the total_time_sec window
-#     return arrival_times_within_window
-
-def get_poisson_arrival_times(arrival_rate, total_time):
+def get_poisson_arrival_times(arrival_rate, total_time, start_time=0.0):
     """
     Given an arrival rate and a time interval, returns the times of arrival 
     based on an exponential distribution.
@@ -77,8 +34,10 @@ def get_poisson_arrival_times(arrival_rate, total_time):
         time_elapsed += next_inter_arrival
         if time_elapsed <= total_time_sec:
             inter_arrival_times.append(time_elapsed)
-
-    return np.array(inter_arrival_times).round()
+    inter_arrival_times = np.array(inter_arrival_times)
+    ## remove arrival times that are before the start time
+    inter_arrival_times = inter_arrival_times[inter_arrival_times >= start_time]
+    return inter_arrival_times.round()
 
 def find_closest_vehicle(vehicles, current_time):
     """

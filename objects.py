@@ -90,7 +90,10 @@ class RouteManager:
                 for j in range(len(set_stops)):
                     od_rate = OD_MATRIX[i][j]
                     if od_rate > 0:
-                        arrival_times = list(get_poisson_arrival_times(od_rate, MAX_TIME_HOURS))
+                        if direction == 'out':
+                            arrival_times = list(get_poisson_arrival_times(od_rate, MAX_TIME_HOURS))
+                        else:
+                            arrival_times = list(get_poisson_arrival_times(od_rate, MAX_TIME_HOURS, start_time=HALF_CYCLE_TIME*60))
                         inter_arrival_times.append(arrival_times)
                     else:
                         inter_arrival_times.append([])
@@ -350,8 +353,10 @@ class EventManager:
             ## time passed since last event
             if self.state_hist['observation']:
                 info['time_passed'] = time_now - self.state_hist['time'][-1]
+                info['cumul_reward'] = np.sum(self.state_hist['reward'])
             else:
                 info['time_passed'] = np.nan
+                info['cumul_reward'] = np.nan
             ## vehicle index
             info['veh_idx'] = self.veh_idx
             info['direction'] = route.vehicles[self.veh_idx].direction
