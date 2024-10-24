@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 
 ## Experimental Design Parameters
-N_EPISODES = 25
+N_EPISODES = 30
 
 pax_results = []
 trip_results = []

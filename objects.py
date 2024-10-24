@@ -77,7 +77,8 @@ class RouteManager:
             'denied': 0,
             'fixed_wait_time': 0,
             'fixed_boardings': 0,
-            'on_time_trips': 0,
+            'early_trips': 0,
+            'late_trips': 0,
             'total_trips': 0
         }
 
@@ -128,26 +129,25 @@ class RouteManager:
 
     def get_reward(self, event):
         ## reward 1: denied passengers
-
-        reward_1 = - self.inter_event['denied'] * REWARD_WEIGHTS['denied']
+        denied_pax = self.inter_event['denied']
+        reward_denied = -1 * denied_pax * REWARD_WEIGHTS['denied']
         
         ## reward 2: fixed wait time
-        excess_wait_time = self.get_excess_wait_time()
-        reward_2 = excess_wait_time * REWARD_WEIGHTS['fixed_wait_time']
+        # excess_wait_time = self.get_excess_wait_time()
+        # reward_2 = excess_wait_time * REWARD_WEIGHTS['fixed_wait_time']
         
-        ## reward 3: on-time performance
-        if self.inter_event['total_trips'] > 0:
-            on_time_rate = self.inter_event['on_time_trips'] / self.inter_event['total_trips']
-        else:
-            on_time_rate = 0
-        reward_3 = on_time_rate * REWARD_WEIGHTS['late']
+        early_trips = self.inter_event['early_trips']
+        reward_early_trips = -1 * early_trips * REWARD_WEIGHTS['early']
         
-        tot_reward = np.float32(reward_1 + reward_3)
-        rewards = [reward_1, reward_2, reward_3]
+        late_trips = self.inter_event['late_trips']
+        reward_late_trips = -1 * late_trips * REWARD_WEIGHTS['late']
 
-        event.state_hist['rewards'].append(rewards)
-        event.state_hist['tot_reward'].append(tot_reward)
-        return tot_reward
+        unweighted_rewards = [denied_pax, early_trips, late_trips]
+        event.state_hist['unweighted_rewards'].append(unweighted_rewards)
+
+        reward = np.float32(reward_denied + reward_early_trips + reward_late_trips)
+        event.state_hist['reward'].append(reward)
+        return reward
     
     def get_n_waiting_pax(self, stop_idx, direction):
         return len(self.stops[direction][stop_idx].active_pax)
@@ -171,7 +171,6 @@ class Vehicle:
                            'departure_time': [], 'load': [],
                            'boardings': [], 'alightings': [], 'scheduled_time': []}
         self.trip_idx = None
-        self.state_hist = {'time': [], 'observation': [], 'action': [], 'tot_reward': []}
     
     def start(self, route):
         self.direction = 'out'
@@ -206,8 +205,11 @@ class Vehicle:
         self.direction = next_direction
 
         ## update the on-time arrivals counter
-        if self.event['next']['time'] <= next_schd_time + SCHEDULE_TOLERANCE:
-            route.inter_event['on_time_trips'] += 1
+        delay = self.event['next']['time'] - next_schd_time
+        if delay > ON_TIME_BOUNDS[1]:
+            route.inter_event['late_trips'] += 1
+        if delay < ON_TIME_BOUNDS[0]:
+            route.inter_event['early_trips'] += 1
 
         ## update the total trips
         route.inter_event['total_trips'] += 1
@@ -290,7 +292,7 @@ class EventManager:
         self.done = 0
         self.requires_control = 0
         self.veh_idx = None
-        self.state_hist = {'time': [],'observation': [], 'action': [], 'tot_reward': [], 'rewards': []}
+        self.state_hist = {'time': [],'observation': [], 'action': [], 'reward': [], 'unweighted_rewards': []}
         self.agents = agents
     
     def start_vehicles(self, route):
@@ -333,32 +335,7 @@ class EventManager:
         observation = get_observation(
             route.vehicles[self.veh_idx], route, CONTROL_STOPS)
 
-        if observation is not None:
-            # stop_idx = route.vehicles[self.veh_idx].event['next']['stop']
-            # direction = route.vehicles[self.veh_idx].direction
-            
-            # flex_stop_idx = stop_idx + 1
-            # flex_stop = route.stops[direction][flex_stop_idx]
-            # n_flex_pax = len(flex_stop.active_pax)
-
-            # ## we will only request an action if there are flex route passengers waiting
-            # if n_flex_pax:
-            #     ## TODO: state trimming and introduce condition if enough buffer time has passed since start of episode
-            #     headway = route.stops[direction][stop_idx].get_latest_headway()/60
-            #     if np.isnan(headway):
-            #         pass
-            #     else:
-            # load = len(route.vehicles[self.veh_idx].pax)
-            # ## get the floor integer of the delay in minutes
-            # delay = round(route.vehicles[self.veh_idx].get_latest_delay(), 1)
-            ## RETURN TUPLE ACCORDING TO GYM (OBSERVATION, REWARD, TERMINATED, TRUNCATED, INFO)
-            # obs = [
-            #     np.int32(stop_idx), 
-            #     np.int32(n_flex_pax), 
-            #     np.float32(headway), 
-            #     np.int32(load), 
-            #     np.float32(delay)]
-            
+        if observation is not None:            
             terminated, truncated = 0, 0
 
             ## reward
@@ -385,10 +362,10 @@ class EventManager:
             self.state_hist['observation'].append(observation)
             self.state_hist['time'].append(time_now)
 
-            vehicle_state_hist = route.vehicles[self.veh_idx].state_hist
-            if len(vehicle_state_hist['observation']):
-                ## update the reward for the vehicle
-                pass
+            # vehicle_state_hist = route.vehicles[self.veh_idx].state_hist
+            # if len(vehicle_state_hist['observation']):
+            #     ## update the reward for the vehicle
+            #     pass
             return observation, reward, terminated, truncated, info
                 
         ## if no control required 

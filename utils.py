@@ -7,11 +7,9 @@ import pandas as pd
 mpl.rcParams['figure.dpi'] = 150
 
 def tabulate_improvements(state: pd.DataFrame, idle: pd.DataFrame, 
-                          pax: pd.DataFrame, trips: pd.DataFrame, 
-                          base_scenario: str = 'DN', flex_stops: list = []) -> tuple:
+                          pax: pd.DataFrame, trips: pd.DataFrame, on_time_bounds: list,
+                          base_scenario: str = 'DN',flex_stops: list = []) -> tuple:
     # Group and aggregate results for each DataFrame
-    # n_lates = state.groupby(['scenario'])['reward_3'].sum()
-    # denied_riders = state.groupby(['scenario'])['reward_1'].sum()
     n_denied = pax[pax['boarding_time'].isna()].groupby(['scenario']).size()
     idle_sum = (idle.groupby(['scenario'])['idle_time'].sum()/60/60).round(2)
     wait_time_mean = pax.groupby(['scenario'])['wait_time'].mean().round(0)
@@ -22,8 +20,11 @@ def tabulate_improvements(state: pd.DataFrame, idle: pd.DataFrame,
     n_flex_pax = pax[(pax['origin'].isin(flex_stops)) & (pax['boarding_time'].notna())].groupby(['scenario']).size()
     n_tot_pax = pax[pax['boarding_time'].notna()].groupby(['scenario']).size()
     n_trips = trips[trips['stop']==0].groupby(['scenario']).size()
+    on_time_trips = trips[(trips['delay'].between(*on_time_bounds)) & (trips['stop']==0)].groupby(['scenario']).size()
     trips['delay'] = trips['arrival_time'] - trips['scheduled_time']
     average_delay_by_group = trips[~trips['stop'].isin(flex_stops)].groupby('scenario')['delay'].mean().round(0)
+    n_deviations = state.groupby(['scenario'])['action'].sum()
+    avg_reward = state.groupby(['scenario'])['reward'].mean().round(3)
     ## get mean delay where delay is the difference between arrival time and scheduled time 
     
 
@@ -39,11 +40,14 @@ def tabulate_improvements(state: pd.DataFrame, idle: pd.DataFrame,
         'flex_ridership': n_flex_pax,
         'tot_ridership': n_tot_pax,
         'n_trips': n_trips,
-        'avg_delay': average_delay_by_group
+        'on_time_trips': on_time_trips,
+        'avg_delay': average_delay_by_group,
+        'n_deviations': n_deviations,
+        'avg_reward': avg_reward
     })
-    # result_df['otp'] = 100 - result_df['n_lates'] / result_df['n_trips'] * 100
+    result_df['on_time_rate'] = (result_df['on_time_trips'] / result_df['n_trips'] * 100).round(2)
     result_df['served_rate'] = 100 - result_df['n_denied_riders'] / (result_df['n_denied_riders']+result_df['flex_ridership']) * 100
-    result_df['served_rate'] = result_df['served_rate'].round(2)
+    result_df['served_rate'] = result_df['served_rate'].fillna(0.0).round(2)
     # Calculate percentage change from the base scenario
     pct_change_df = result_df.copy()
     for col in result_df.columns:
@@ -79,5 +83,5 @@ def plot_cumulative_idle_time(df, figsize=(4,3)):
     plt.show()
 
 
-def create_field_from_state_item(df, list_index, new_field_name):
-    df[new_field_name] = df['observation'].apply(lambda x: float(x.split(',')[list_index].strip('[]')))
+def create_field_from_list_column(df, list_index, new_field_name, field_name='observation'):
+    df[new_field_name] = df[field_name].apply(lambda x: float(x.split(',')[list_index].strip('[]')))

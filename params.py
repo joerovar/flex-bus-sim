@@ -11,7 +11,7 @@ FLEX_STOPS = [2, 4]
 CONTROL_STOPS = [i-1 for i in FLEX_STOPS]
 
 ## travel/dwell times
-STATIC_DWELL = 5 # seconds
+STATIC_DWELL = 7 # seconds
 DYNAMIC_DWELL = 2 # seconds
 SEGMENT_TIMES = {
     'flex': {'mean': 80, 'std': 20},
@@ -53,15 +53,16 @@ MAX_WAIT_TIME_FLEX = 10 # minutes
 REMOVE_LONG_WAIT_FLEX = True
 
 ## time until a trip is considered late
-SCHEDULE_TOLERANCE = 3
+SCHEDULE_TOLERANCE = 3 ## minutes
+ON_TIME_BOUNDS = (-60, 120) ## seconds
 
 ## State definition
 # Define the bounds for each state variable in the environment
 
 REWARD_WEIGHTS = {
-    'denied': 1,
-    'fixed_wait_time': 1,
-    'late': 1
+    'denied': 1.0,
+    'early': 2.0,
+    'late': 2.0
 }
 
 ## SELECTIVE DEVIATION PARAMETERS
