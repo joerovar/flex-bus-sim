@@ -39,7 +39,7 @@ def get_poisson_arrival_times(arrival_rate, total_time, start_time=0.0):
     inter_arrival_times = inter_arrival_times[inter_arrival_times >= start_time]
     return inter_arrival_times.round()
 
-def find_closest_vehicle(vehicles, current_time):
+def find_next_event_vehicle_index(vehicles, current_time):
     """
     Finds the index of the vehicle whose event['next']['time'] is closest to the current time.
 
@@ -238,6 +238,24 @@ def plot_min_pax_threshold():
     axs.set_title('Minimum Pax Threshold vs. Delay')
     plt.show()
 
-# Example usage:
-# To get the bin index for 'headway' with an actual value of 7:
-# bin_index = get_bin_index('headway', 7)   # Returns 1, because 7 falls into the 5-10 range
+def get_action(policy, obs=None):
+    if policy == 'ND':
+        return 0 ## never deviate
+    elif policy == 'AD':
+        return 1
+    elif policy == 'RA':
+        return np.random.choice([0,1])
+    elif policy == 'SD':
+        delay = obs[4]
+        if delay < DELAY_THRESHOLD:
+            return 1
+        else:
+            return 0
+    elif policy == 'DSD':
+        delay = obs[4]
+        n_pax = obs[1]
+        min_pax = get_min_pax_threshold(delay)
+        if n_pax >= min_pax:
+            return 1
+        else:
+            return 0

@@ -287,7 +287,7 @@ class Vehicle:
         return self.event['next']['stop'], self.direction
 
 
-class EventManager:
+class EnvironmentManager:
     def __init__(self, agents='independent') -> None:
         start_time = 0
         self.timestamps = [start_time]
@@ -297,46 +297,45 @@ class EventManager:
         self.veh_idx = None
         self.state_hist = {'time': [],'observation': [], 'action': [], 'reward': [], 'unweighted_rewards': []}
         self.agents = agents
+        self.route = RouteManager()
     
-    def start_vehicles(self, route):
-        for vehicle in route.vehicles:
-            vehicle.start(route)
-    
-    def get_global_tuple():
-        pass
+    def start_vehicles(self):
+        for vehicle in self.route.vehicles:
+            vehicle.start(self.route)
 
-    def step(self, route, action=None):
-        if (action is not None) and (self.veh_idx is not None):
+    def step(self, action=None):
+        if action is not None:
             ## update
             self.state_hist['action'].append(action)
             ## perform event
-            route.vehicles[self.veh_idx].depart_stop(deviate=action)
-            return self.step(route)
+            self.route.vehicles[self.veh_idx].depart_stop(deviate=action)
         
-        self.veh_idx = find_closest_vehicle(route.vehicles, self.timestamps[-1])
+        self.veh_idx = find_next_event_vehicle_index(self.route.vehicles, self.timestamps[-1])
 
         ## add new time to list of timestamps
-        self.timestamps.append(route.vehicles[self.veh_idx].event['next']['time'])
-
+        self.timestamps.append(self.route.vehicles[self.veh_idx].event['next']['time'])
         time_now = self.timestamps[-1]
-        
-        
+    
+        if time_now > MAX_TIME_HOURS*60*60:
+            print('crazy')
+            print(time_now)
+            raise ValueError(f'Time limit exceeded at {time_now}')
+
         ## get all passengers up to the current time
-        route.get_active_pax(time_now)
+        self.route.get_active_pax(time_now)
 
         ## check control
         observation = get_observation(
-            route.vehicles[self.veh_idx], route, CONTROL_STOPS)
+            self.route.vehicles[self.veh_idx], self.route, CONTROL_STOPS)
 
-        if observation is not None:            
-
+        if observation is not None:           
             ## reward
             if self.state_hist['observation']:
-                reward = route.get_reward(self)
+                reward = self.route.get_reward(self)
             else:
                 reward = np.nan
 
-            info = route.inter_event.copy()
+            info = self.route.inter_event.copy()
             ## add time
             info['time'] = time_now
             ## time passed since last event
@@ -348,20 +347,13 @@ class EventManager:
                 info['cumul_reward'] = np.nan
             ## vehicle index
             info['veh_idx'] = self.veh_idx
-            info['direction'] = route.vehicles[self.veh_idx].direction
+            info['direction'] = self.route.vehicles[self.veh_idx].direction
             ## reset counters after using it for reward and info
-            for ky in route.inter_event:
-                route.inter_event[ky] = 0
+            for ky in self.route.inter_event:
+                self.route.inter_event[ky] = 0
 
-            if time_now > MAX_TIME_HOURS*60*60:
-                ## RETURN TUPLE ACCORDING TO GYM (OBSERVATION, REWARD, TERMINATED, TRUNCATED, INFO)
-                # observation = []
-                # reward = None
+            if time_now > MAX_TIME_HOURS*60*60 - 1800:
                 terminated, truncated = 1, 1
-                # info = {}
-                ## remove the last item of the state history
-                # for ky in ('time', 'observation', 'action'):
-                #     self.state_hist[ky].pop(-1)
                 return observation, reward, terminated, truncated, info
             ## bookkeeping
             self.state_hist['observation'].append(observation)
@@ -374,11 +366,11 @@ class EventManager:
             return observation, reward, terminated, truncated, info
                 
         ## if no control required 
-        if route.vehicles[self.veh_idx].event['next']['type'] == 'arrive':
-            route.vehicles[self.veh_idx].arrive_at_stop(route)
-            return self.step(route)
+        if self.route.vehicles[self.veh_idx].event['next']['type'] == 'arrive':
+            self.route.vehicles[self.veh_idx].arrive_at_stop(self.route)
+            return self.step()
         
-        if route.vehicles[self.veh_idx].event['next']['type'] == 'depart':
-            route.vehicles[self.veh_idx].depart_stop()
-            return self.step(route)
+        if self.route.vehicles[self.veh_idx].event['next']['type'] == 'depart':
+            self.route.vehicles[self.veh_idx].depart_stop()
+            return self.step()
 

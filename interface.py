@@ -1,6 +1,6 @@
-from train import IndependentAgents, STATE_KEYS
+from train import FlexSimEnv, STATE_KEYS
 
-env = IndependentAgents()
+env = FlexSimEnv()
 obs, info = env.reset()
 print("-------------")
 for i, key in enumerate(STATE_KEYS):

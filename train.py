@@ -2,7 +2,7 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 from params import *
-from objects import *
+from objects import EnvironmentManager
 ## import the PPO agent from stable_baselines
 from stable_baselines3 import PPO
 ## import the evaluate_policy function
@@ -29,7 +29,7 @@ class FlexSimEnv(gym.Env):
         self.route = None
 
     def step(self, action):
-        observation, reward, terminated, truncated, info = self.env.step(self.route, action)
+        observation, reward, terminated, truncated, info = self.env.step(action)
         if len(observation) == 0:
             print(observation, reward, terminated, truncated)
         # Make sure the observation is returned as a dictionary matching the observation space
@@ -44,11 +44,10 @@ class FlexSimEnv(gym.Env):
         return obs_dict, reward, terminated, truncated, info
 
     def reset(self, seed=None, options=None):
-        self.route = RouteManager()
-        self.env = EventManager()
-        self.env.start_vehicles(self.route)
-        self.route.load_all_pax()
-        observation, _, _, _, info = self.env.step(self.route, action=None)
+        self.env = EnvironmentManager()
+        self.env.start_vehicles()
+        self.env.route.load_all_pax()
+        observation, _, _, _, info = self.env.step(action=None)
 
         # Ensure the initial observation is a dictionary
         obs_dict = {
@@ -74,11 +73,11 @@ def train_flexsim():
     env.reset()
 
     # Train the agent
-    agent = PPO("MultiInputPolicy", env, verbose=1)
-    agent.learn(total_timesteps=100)
+    agent = PPO("MultiInputPolicy", env, verbose=1, n_steps=200)
+    agent.learn(total_timesteps=1200)
 
     # Save the trained agent
-    agent.save("ppo_flexsim")
+    # agent.save("ppo_flexsim")
 
     # Evaluate the agent
     mean_reward, std_reward = evaluate_policy(agent, env, n_eval_episodes=5)

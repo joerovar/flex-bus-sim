@@ -2,7 +2,7 @@ PATH_ROUTES = 'data/routes.csv'
 PATH_STOPS = 'data/stops.csv'
 
 ## simulation parameters
-MAX_TIME_HOURS = 3 # hours
+MAX_TIME_HOURS = 3.5 # hours
 N_VEHICLES = 2
 
 ## route layout
