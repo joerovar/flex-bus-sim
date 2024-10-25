@@ -11,6 +11,9 @@ trip_results = []
 state_results = []
 idle_results = []
 
+##TODO: Modularize the code to allow for different scenarios
+##TODO: Add seed and verify reproducibility
+
 if __name__ == '__main__':
     ## evaluation
     

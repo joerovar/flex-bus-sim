@@ -3,42 +3,23 @@ import numpy as np
 from gymnasium import spaces
 from params import *
 from objects import *
+## import the PPO agent from stable_baselines
+from stable_baselines3 import PPO
+## import the evaluate_policy function
+from stable_baselines3.common.evaluation import evaluate_policy
 
 STATE_KEYS = ['stop_idx', 'n_flex_pax', 'load', 'headway', 'delay']
 
-class IndependentAgents(gym.Env):
+class FlexSimEnv(gym.Env):
     """Custom Environment that follows gym interface."""
-
-    metadata = {"render_modes": ["human"], "render_fps": 30}
-
     def __init__(self):
-        super().__init__()
-
-        ## Define the mixed observation space components
-
-        # stop_idx: index of the stop in the route (discrete space, 7 stops: 0-6)
-        stop_idx_space = spaces.Discrete(7)
-
-        # n_flex_pax: discrete number of flexible passengers (max 7 passengers)
-        n_flex_pax_space = spaces.Discrete(8)  # 0 to 7 passengers
-
-        # headway: continuous time between the current and last vehicle (e.g., [0, 20] minutes)
-        headway_space = spaces.Box(low=0, high=20, shape=(1,), dtype=np.float32)
-
-        # load: discrete load (number of passengers on the vehicle, max 20 passengers)
-        load_space = spaces.Discrete(21)  # 0 to 20 passengers
-
-        # delay: continuous delay (difference between scheduled and actual arrival in minutes, e.g., [-10, 10])
-        delay_space = spaces.Box(low=-10, high=10, shape=(1,), dtype=np.float32)
-
-        ## Combine the observation spaces using a Tuple
-        self.observation_space = spaces.Tuple((
-            stop_idx_space,    # Discrete integer for stop index
-            n_flex_pax_space,  # Discrete integer for number of flexible passengers
-            headway_space,     # Continuous float for headway
-            load_space,        # Discrete integer for load
-            delay_space        # Continuous float for delay
-        ))
+        self.observation_space = spaces.Dict({
+            "stop_idx": spaces.Box(0.0, 6.0, (1,), dtype=np.float32),    # Replaces Discrete(7)
+            "n_flex_pax": spaces.Box(0.0, 7.0, (1,), dtype=np.float32),    # Replaces Discrete(8)
+            "headway": spaces.Box(0.0, 1200.0, (1,), dtype=np.float32),  # headway (continuous)
+            "load": spaces.Box(0.0, 29.0, (1,), dtype=np.float32),   # Replaces Discrete(30)
+            "delay": spaces.Box(-600.0, 600.0, (1,), dtype=np.float32) # delay (continuous)
+        })
 
         ## Action space remains discrete (binary actions: deviate or not)
         self.action_space = spaces.Discrete(2)
@@ -49,7 +30,18 @@ class IndependentAgents(gym.Env):
 
     def step(self, action):
         observation, reward, terminated, truncated, info = self.env.step(self.route, action)
-        return observation, reward, terminated, truncated, info
+        if len(observation) == 0:
+            print(observation, reward, terminated, truncated)
+        # Make sure the observation is returned as a dictionary matching the observation space
+        obs_dict = {
+            "stop_idx": np.array([observation[0]], dtype=np.float32),
+            "n_flex_pax": np.array([observation[1]], dtype=np.float32),
+            "headway": np.array([observation[2]], dtype=np.float32),
+            "load": np.array([observation[3]], dtype=np.float32),
+            "delay": np.array([observation[4]], dtype=np.float32)
+        }
+
+        return obs_dict, reward, terminated, truncated, info
 
     def reset(self, seed=None, options=None):
         self.route = RouteManager()
@@ -57,10 +49,42 @@ class IndependentAgents(gym.Env):
         self.env.start_vehicles(self.route)
         self.route.load_all_pax()
         observation, _, _, _, info = self.env.step(self.route, action=None)
-        return observation, info
+
+        # Ensure the initial observation is a dictionary
+        obs_dict = {
+            "stop_idx": np.array([observation[0]], dtype=np.float32),
+            "n_flex_pax": np.array([observation[1]], dtype=np.float32),
+            "headway": np.array([observation[2]], dtype=np.float32),
+            "load": np.array([observation[3]], dtype=np.float32),
+            "delay": np.array([observation[4]], dtype=np.float32)
+        }
+
+        return obs_dict, info
 
     def render(self):
         pass
 
     def close(self):
         pass
+
+# function to train a simple PPO agent on the FlexSim environment
+def train_flexsim():
+    env = FlexSimEnv()
+    # env.seed(0)
+    env.reset()
+
+    # Train the agent
+    agent = PPO("MultiInputPolicy", env, verbose=1)
+    agent.learn(total_timesteps=100)
+
+    # Save the trained agent
+    agent.save("ppo_flexsim")
+
+    # Evaluate the agent
+    mean_reward, std_reward = evaluate_policy(agent, env, n_eval_episodes=5)
+    print(f"Mean reward: {mean_reward} +/- {std_reward}")
+
+    # Close the environment
+    env.close()
+
+train_flexsim()

@@ -320,16 +320,6 @@ class EventManager:
 
         time_now = self.timestamps[-1]
         
-        if time_now > MAX_TIME_HOURS*60*60:
-            ## RETURN TUPLE ACCORDING TO GYM (OBSERVATION, REWARD, TERMINATED, TRUNCATED, INFO)
-            observation = []
-            reward = None
-            terminated, truncated = 1, 1
-            info = {}
-            ## remove the last item of the state history
-            for ky in ('time', 'observation', 'action'):
-                self.state_hist[ky].pop(-1)
-            return observation, reward, terminated, truncated, info
         
         ## get all passengers up to the current time
         route.get_active_pax(time_now)
@@ -339,7 +329,6 @@ class EventManager:
             route.vehicles[self.veh_idx], route, CONTROL_STOPS)
 
         if observation is not None:            
-            terminated, truncated = 0, 0
 
             ## reward
             if self.state_hist['observation']:
@@ -363,10 +352,21 @@ class EventManager:
             ## reset counters after using it for reward and info
             for ky in route.inter_event:
                 route.inter_event[ky] = 0
+
+            if time_now > MAX_TIME_HOURS*60*60:
+                ## RETURN TUPLE ACCORDING TO GYM (OBSERVATION, REWARD, TERMINATED, TRUNCATED, INFO)
+                # observation = []
+                # reward = None
+                terminated, truncated = 1, 1
+                # info = {}
+                ## remove the last item of the state history
+                # for ky in ('time', 'observation', 'action'):
+                #     self.state_hist[ky].pop(-1)
+                return observation, reward, terminated, truncated, info
             ## bookkeeping
             self.state_hist['observation'].append(observation)
             self.state_hist['time'].append(time_now)
-
+            terminated, truncated = 0, 0
             # vehicle_state_hist = route.vehicles[self.veh_idx].state_hist
             # if len(vehicle_state_hist['observation']):
             #     ## update the reward for the vehicle
