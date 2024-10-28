@@ -30,8 +30,6 @@ class FlexSimEnv(gym.Env):
 
     def step(self, action):
         observation, reward, terminated, truncated, info = self.env.step(action)
-        if len(observation) == 0:
-            print(observation, reward, terminated, truncated)
         # Make sure the observation is returned as a dictionary matching the observation space
         obs_dict = {
             "stop_idx": np.array([observation[0]], dtype=np.float32),
@@ -66,24 +64,45 @@ class FlexSimEnv(gym.Env):
     def close(self):
         pass
 
+from stable_baselines3.common.monitor import Monitor
+
 # function to train a simple PPO agent on the FlexSim environment
-def train_flexsim():
+def train_flexsim(n_steps=200, total_timesteps=1200, verbose=1, save=False, test=False):
+    # env = Monitor(FlexSimEnv())
     env = FlexSimEnv()
-    # env.seed(0)
     env.reset()
 
-    # Train the agent
-    agent = PPO("MultiInputPolicy", env, verbose=1, n_steps=200)
-    agent.learn(total_timesteps=1200)
+    # Initialize the PPO agent with specified n_steps and verbosity
+    model = PPO("MultiInputPolicy", env, verbose=verbose, n_steps=n_steps)
+    
+    # Train the agent for the specified number of timesteps
+    model.learn(total_timesteps=total_timesteps)
 
-    # Save the trained agent
-    # agent.save("ppo_flexsim")
+    # Save the agent if save=True
+    if save:
+        model.save("ppo_flexsim")
+        print("Agent saved as 'ppo_flexsim'.")
 
-    # Evaluate the agent
-    mean_reward, std_reward = evaluate_policy(agent, env, n_eval_episodes=5)
-    print(f"Mean reward: {mean_reward} +/- {std_reward}")
+    if test:
+        model = PPO.load("ppo_flexsim")
+        # Evaluate the agent
+        mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=30)
+        print(f"Mean reward: {mean_reward} +/- {std_reward}")
 
-    # Close the environment
-    env.close()
+        rewards = []
+        for i in range(30):
+            # env = Monitor(FlexSimEnv())
+            env = FlexSimEnv()
 
-train_flexsim()
+            obs, info = env.reset()
+            action, _ = model.predict(obs, deterministic=True)
+            obs, reward, terminated, truncated, info = env.step(action=action)
+            while not terminated:
+                # Use the loaded agent to predict the action based on current observation
+                action, _ = model.predict(obs, deterministic=True)
+                obs, reward, terminated, truncated, info = env.step(action=action)
+                rewards.append(reward)
+        print(np.mean(rewards))
+
+# Run the training with the default parameters or pass specific values for testing
+# train_flexsim(n_steps=256, total_timesteps=12000, verbose=0, save=True, test=True)

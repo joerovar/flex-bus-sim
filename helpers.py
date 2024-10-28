@@ -218,15 +218,15 @@ def convert_duration_string_to_minutes(duration_str):
 def pct_change(val_from, val_to, decimals=2):
     return round((val_to - val_from) / val_from, decimals)
 
-def get_min_pax_threshold(delay):
-    if delay < MIN_PAX_THRESHOLDS[0][0]:
-        return MIN_PAX_THRESHOLDS[0][1]
-    elif delay < MIN_PAX_THRESHOLDS[1][0]:
-        return MIN_PAX_THRESHOLDS[1][1]
-    elif delay < MIN_PAX_THRESHOLDS[2][0]:
-        return MIN_PAX_THRESHOLDS[2][1]
+def get_min_pax_threshold(delay, min_pax_thresholds):
+    if delay < min_pax_thresholds[0][0]:
+        return min_pax_thresholds[0][1]
+    elif delay < min_pax_thresholds[1][0]:
+        return min_pax_thresholds[1][1]
+    elif delay < min_pax_thresholds[2][0]:
+        return min_pax_thresholds[2][1]
     else:
-        return MIN_PAX_THRESHOLDS[3][1]
+        return min_pax_thresholds[3][1]
     
 def plot_min_pax_threshold():
     fig, axs = plt.subplots(figsize=(4, 3))
@@ -238,7 +238,7 @@ def plot_min_pax_threshold():
     axs.set_title('Minimum Pax Threshold vs. Delay')
     plt.show()
 
-def get_action(policy, obs=None):
+def get_action(policy, obs=None, min_pax_thresholds=None):
     if policy == 'ND':
         return 0 ## never deviate
     elif policy == 'AD':
@@ -254,7 +254,7 @@ def get_action(policy, obs=None):
     elif policy == 'DSD':
         delay = obs[4]
         n_pax = obs[1]
-        min_pax = get_min_pax_threshold(delay)
+        min_pax = get_min_pax_threshold(delay, min_pax_thresholds)
         if n_pax >= min_pax:
             return 1
         else:

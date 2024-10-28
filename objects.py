@@ -352,7 +352,7 @@ class EnvironmentManager:
             for ky in self.route.inter_event:
                 self.route.inter_event[ky] = 0
 
-            if time_now > MAX_TIME_HOURS*60*60 - 1800:
+            if time_now > MAX_TIME_HOURS*60*60 - BUFFER_SECONDS:
                 terminated, truncated = 1, 1
                 return observation, reward, terminated, truncated, info
             ## bookkeeping

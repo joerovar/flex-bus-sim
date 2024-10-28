@@ -3,6 +3,7 @@ PATH_STOPS = 'data/stops.csv'
 
 ## simulation parameters
 MAX_TIME_HOURS = 3.5 # hours
+BUFFER_SECONDS = 1800 # seconds
 N_VEHICLES = 2
 
 ## route layout
@@ -70,7 +71,7 @@ DELAY_THRESHOLD = 60
 
 ## DYNAMIC SMART GREEDY PARAMETERS
 ## define list where each item is the (max_delay, pax_threshold)
-MIN_PAX_THRESHOLDS = [(0, 1), (120, 2), (240, 4) ,(1000, 5)]
+DEFAULT_MIN_PAX_THRESHOLDS = [(30, 1), (150, 2), (240, 4) ,(1000, 5)]
 
 ## PATHS FOR OUTPUT
 OUTPUT_FOLDER_PATH = 'outputs/'

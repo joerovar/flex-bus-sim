@@ -12,13 +12,20 @@ trip_results = []
 state_results = []
 idle_results = []
 
-SCENARIOS = ['ND', 'AD', 'RA', 'SD', 'DSD']
+SCENARIO = 'DSD'
+
+PARAMETERS = [
+[(60, 1), (180, 2), (240, 4) ,(1000, 5)], ## more loose
+[(30, 1), (150, 2), (240, 4) ,(1000, 5)], ## more loose
+[(30, 1), (120, 2), (240, 4) ,(1000, 5)], ## more loose
+[(0, 1), (120, 2), (240, 4) ,(1000, 5)], ## medium
+[(0, 1), (90, 2), (180, 4) ,(1000, 5)] ## more strict
+]
 
 if __name__ == '__main__':
     ## evaluation
     
-    ## SCENARIO NEVER DEVIATE (ND)
-    for scenario in SCENARIOS:
+    for j, parameter in enumerate(PARAMETERS):
         ## set seeds
         np.random.seed(0)
 
@@ -30,7 +37,7 @@ if __name__ == '__main__':
 
             obs, reward, terminated, truncated, info = env.step(action=None)
             while not terminated:
-                action = get_action(scenario, obs, min_pax_thresholds=DEFAULT_MIN_PAX_THRESHOLDS)
+                action = get_action(SCENARIO, obs, min_pax_thresholds=parameter)
                 obs, reward, terminated, truncated, info = env.step(action=action)
     
             pax_hist = get_pax_hist(env.route, FLEX_STOPS, include_denied=True)
@@ -39,42 +46,13 @@ if __name__ == '__main__':
             idle_hist = pd.DataFrame(env.route.idle_time)
 
             for hist in (pax_hist, veh_hist, state_hist, idle_hist):
-                hist['scenario'] = scenario
+                hist['scenario'] = SCENARIO + '_param_' + str(j)
                 hist['episode'] = i
 
             pax_results.append(pax_hist)
             trip_results.append(veh_hist)
             state_results.append(state_hist)
             idle_results.append(idle_hist)
-
-    scenario = 'RL'
-    model = PPO.load("ppo_flexsim")
-
-    rewards = []
-    for i in range(N_EPISODES):
-        rl_env = FlexSimEnv()
-
-        obs, info = rl_env.reset()
-        action, _ = model.predict(obs, deterministic=True)
-        obs, reward, terminated, truncated, info = rl_env.step(action=action)
-        while not terminated:
-            # Use the loaded agent to predict the action based on current observation
-            action, _ = model.predict(obs, deterministic=True)
-            obs, reward, terminated, truncated, info = rl_env.step(action=action)
-
-        pax_hist = get_pax_hist(rl_env.env.route, FLEX_STOPS, include_denied=True)
-        veh_hist = get_vehicle_history(rl_env.env.route.vehicles, FLEX_STOPS)
-        state_hist = pd.DataFrame(rl_env.env.state_hist)
-        idle_hist = pd.DataFrame(rl_env.env.route.idle_time)
-
-        for hist in (pax_hist, veh_hist, state_hist, idle_hist):
-            hist['scenario'] = scenario
-            hist['episode'] = i
-
-        pax_results.append(pax_hist)
-        trip_results.append(veh_hist)
-        state_results.append(state_hist)
-        idle_results.append(idle_hist)
 
 # Get the current date and time
 now = datetime.now()
