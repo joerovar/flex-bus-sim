@@ -109,3 +109,10 @@ def plot_exponential_decay_by_factor():
     axs.legend(title='Decay Factor')
     axs.set_ylim(0,1)
     plt.show()
+
+## OD_MATRIX IS A LIST OF LISTS OF INTEGERS
+## GIVE ME A HEATMAP OUT OF THEM
+def get_heatmap(od_matrix, title):
+    plt.figure(figsize=(4, 4))
+    sns.heatmap(od_matrix, annot=True, fmt="d", cmap="YlGnBu")
+    plt.title(title)

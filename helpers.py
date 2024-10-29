@@ -228,15 +228,16 @@ def get_min_pax_threshold(delay, min_pax_thresholds):
     else:
         return min_pax_thresholds[3][1]
     
-def plot_min_pax_threshold():
+def plot_min_pax_threshold(min_pax_thresholds):
     fig, axs = plt.subplots(figsize=(4, 3))
-    delays = np.arange(0, 10, 0.1)
-    thresholds = [get_min_pax_threshold(delay) for delay in delays]
-    axs.plot(delays, thresholds)
+    delays = np.arange(-120, 400, 5)
+    thresholds = [get_min_pax_threshold(delay, min_pax_thresholds) for delay in delays]
+    axs.plot(delays/60, thresholds)
     axs.set_xlabel('Delay (minutes)')
     axs.set_ylabel('Minimum Pax Threshold')
-    axs.set_title('Minimum Pax Threshold vs. Delay')
+    axs.set_title('Pax thresholds for Dynamic Rule Deviation (DRD)')
     plt.show()
+
 
 def get_action(policy, obs=None, min_pax_thresholds=None):
     if policy == 'ND':
