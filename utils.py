@@ -25,6 +25,8 @@ def tabulate_improvements(state: pd.DataFrame, idle: pd.DataFrame,
     average_delay_by_group = trips[~trips['stop'].isin(flex_stops)].groupby('scenario')['delay'].mean().round(0)
     n_deviations = state.groupby(['scenario'])['action'].sum()
     avg_reward = state.groupby(['scenario'])['reward'].mean().round(3)
+    avg_episode_reward = state.groupby(['scenario', 'episode'])['reward'].sum()
+    avg_episode_reward = avg_episode_reward.groupby('scenario').mean().round(3)
     ## get mean delay where delay is the difference between arrival time and scheduled time 
     
 
@@ -43,7 +45,8 @@ def tabulate_improvements(state: pd.DataFrame, idle: pd.DataFrame,
         'on_time_trips': on_time_trips,
         'avg_delay': average_delay_by_group,
         'n_deviations': n_deviations,
-        'avg_reward': avg_reward
+        'avg_reward': avg_reward,
+        'avg_episode_reward': avg_episode_reward
     })
     result_df['on_time_rate'] = (result_df['on_time_trips'] / result_df['n_trips'] * 100).round(2)
     result_df['served_rate'] = 100 - result_df['n_denied_riders'] / (result_df['n_denied_riders']+result_df['flex_ridership']) * 100
@@ -114,5 +117,5 @@ def plot_exponential_decay_by_factor():
 ## GIVE ME A HEATMAP OUT OF THEM
 def get_heatmap(od_matrix, title):
     plt.figure(figsize=(4, 4))
-    sns.heatmap(od_matrix, annot=True, fmt="d", cmap="YlGnBu")
+    sns.heatmap(od_matrix, annot=True, cmap="YlGnBu")
     plt.title(title)

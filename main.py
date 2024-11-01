@@ -12,7 +12,7 @@ trip_results = []
 state_results = []
 idle_results = []
 
-SCENARIOS = ['ND', 'AD', 'RA', 'SD', 'DSD']
+SCENARIOS = ['ND', 'AD', 'RA', 'FRD', 'DRD']
 
 if __name__ == '__main__':
     ## evaluation

@@ -3,7 +3,7 @@ PATH_STOPS = 'data/stops.csv'
 
 ## simulation parameters
 MAX_TIME_HOURS = 3.5 # hours
-BUFFER_SECONDS = 1800 # seconds
+BUFFER_SECONDS = 2000 # seconds
 N_VEHICLES = 2
 
 ## route layout
@@ -33,8 +33,8 @@ SCHEDULED_STOP_TIMES = [
     600]
 
 ## demand parameters
-OD_LOW = 3
-OD_HIGH = 6
+OD_LOW = 3.5
+OD_HIGH = 6.5
 
 OD_MATRIX = [
     [0, OD_LOW, 0, OD_HIGH, 0, OD_HIGH, 0],
@@ -62,8 +62,8 @@ ON_TIME_BOUNDS = (-60, 120) ## seconds
 
 REWARD_WEIGHTS = {
     'denied': 1.0,
-    'early': 2.5,
-    'late': 2.5
+    'early': 1.0,
+    'late': 3.0
 }
 
 ## SELECTIVE DEVIATION PARAMETERS
@@ -71,7 +71,7 @@ DELAY_THRESHOLD = 60
 
 ## DYNAMIC SMART GREEDY PARAMETERS
 ## define list where each item is the (max_delay, pax_threshold)
-DEFAULT_MIN_PAX_THRESHOLDS = [(30, 1), (150, 2), (240, 4) ,(1000, 5)]
+DEFAULT_MIN_PAX_THRESHOLDS = [(0, 1), (90, 2), (180, 4) ,(1000, 5)]
 
 ## PATHS FOR OUTPUT
 OUTPUT_FOLDER_PATH = 'outputs/'
