@@ -1,10 +1,10 @@
-from train import FlexSimEnv, STATE_KEYS
+from rl_env import FlexSimEnv, STATE_KEYS
 
 env = FlexSimEnv()
 obs, info = env.reset()
 print("-------------")
-for i, key in enumerate(STATE_KEYS):
-    print(f"{key}: {obs[i]}")
+for key in obs:
+    print(f"{key}: {obs[key]}")
 print(f'info: {info}')
 
 ## for every step, print out the state, action, request input from user for action
@@ -20,7 +20,6 @@ while not terminated or env.env.timestamps[-1] < 4000:
         obs, reward, terminated, truncated, info = env.step(action)
         print("-------------")
         print(f"Reward: {reward}, Info: {info}")
-        for i, key in enumerate(STATE_KEYS):
-            print(f"{key}: {obs[i]}")
-
+        for key in obs:
+            print(f"{key}: {obs[key]}")
 ## behaving reasonably by time 4951 i am getting cumulative reward of -4

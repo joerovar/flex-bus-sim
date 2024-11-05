@@ -132,22 +132,23 @@ def get_observation(vehicle: object, route: object, control_stops: list):
     if stop_idx not in control_stops:
         return None
     flex_stop_idx = stop_idx + 1
-    stop = route.stops[direction][stop_idx]
+    control_stop = route.stops[direction][stop_idx]
     flex_stop = route.stops[direction][flex_stop_idx]
     n_flex_pax = route.get_n_waiting_pax(flex_stop_idx, direction)
 
     ## check conditions
     is_departing = vehicle.event['next']['type'] == 'depart'
     flex_pax_waiting = len(flex_stop.active_pax) > 0
-    not_first_arrival = len(stop.last_arrival_time) > 1
+    not_first_arrival = len(control_stop.last_arrival_time) > 1
 
     if is_departing and flex_pax_waiting and not_first_arrival:
         observation = [
             np.int32(stop_idx), 
             np.int32(n_flex_pax), 
             np.int32(len(vehicle.pax)), 
-            np.float32(stop.get_latest_headway()), 
-            np.float32(vehicle.get_latest_delay())
+            np.float32(control_stop.get_latest_headway()), 
+            np.float32(vehicle.get_latest_delay()),
+            np.int32(control_stop.last_action)
         ]
         return observation
     return None

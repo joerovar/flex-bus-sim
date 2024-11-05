@@ -17,6 +17,8 @@ class Stop:
         self.inactive_pax_arrival_times = np.array([]) ## to easily filter
         self.direction = direction
         self.last_arrival_time = []
+        ## only for control stops
+        self.last_action = 0
     
     def move_to_active_pax(self, time_now):
         for dest_idx in range(len(self.inactive_pax_arrival_times)):
@@ -255,7 +257,7 @@ class Vehicle:
         route.stops[self.direction][stop_idx].last_arrival_time.append(time_now)
         # print(f"Vehicle {self.idx} arrived at stop {stop_idx} in direction {self.direction} at {time_now}")
     
-    def depart_stop(self, deviate=0):
+    def depart_stop(self, route, deviate=0):
         time_now = self.event['next']['time']
 
         ## set destination
@@ -265,6 +267,9 @@ class Vehicle:
         self.event['next']['type'] = 'arrive'
 
         stop = self.event['next']['stop']
+
+        ## record action
+        route.stops[self.direction][self.event['next']['stop']].last_action = deviate
 
         if (not deviate) and (stop in CONTROL_STOPS):
             ## advance to next fixed stop (two stops ahead)
@@ -308,7 +313,7 @@ class EnvironmentManager:
             ## update
             self.state_hist['action'].append(action)
             ## perform event
-            self.route.vehicles[self.veh_idx].depart_stop(deviate=action)
+            self.route.vehicles[self.veh_idx].depart_stop(self.route, deviate=action)
         
         self.veh_idx = find_next_event_vehicle_index(self.route.vehicles, self.timestamps[-1])
 
@@ -371,6 +376,6 @@ class EnvironmentManager:
             return self.step()
         
         if self.route.vehicles[self.veh_idx].event['next']['type'] == 'depart':
-            self.route.vehicles[self.veh_idx].depart_stop()
+            self.route.vehicles[self.veh_idx].depart_stop(self.route)
             return self.step()
 

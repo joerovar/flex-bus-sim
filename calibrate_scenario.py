@@ -2,7 +2,7 @@ from objects import EnvironmentManager
 from helpers import *
 import os
 from datetime import datetime
-from train import *
+from rl_env import *
 
 ## Experimental Design Parameters
 N_EPISODES = 30

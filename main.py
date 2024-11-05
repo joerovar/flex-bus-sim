@@ -2,7 +2,8 @@ from objects import EnvironmentManager
 from helpers import *
 import os
 from datetime import datetime
-from train import *
+from rl_env import *
+from stable_baselines3 import PPO
 
 ## Experimental Design Parameters
 N_EPISODES = 30
@@ -48,7 +49,7 @@ if __name__ == '__main__':
             idle_results.append(idle_hist)
 
     scenario = 'RL'
-    model = PPO.load("ppo_flexsim")
+    model = PPO.load("models/ppo_flexsim")
 
     rewards = []
     for i in range(N_EPISODES):

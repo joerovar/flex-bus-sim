@@ -2,8 +2,8 @@ PATH_ROUTES = 'data/routes.csv'
 PATH_STOPS = 'data/stops.csv'
 
 ## simulation parameters
-MAX_TIME_HOURS = 3.5 # hours
-BUFFER_SECONDS = 2000 # seconds
+MAX_TIME_HOURS = 4.0 # hours
+BUFFER_SECONDS = 3600 # seconds
 N_VEHICLES = 2
 
 ## route layout
@@ -15,7 +15,7 @@ CONTROL_STOPS = [i-1 for i in FLEX_STOPS]
 STATIC_DWELL = 7 # seconds
 DYNAMIC_DWELL = 2 # seconds
 SEGMENT_TIMES = {
-    'flex': {'mean': 80, 'std': 20},
+    'flex': {'mean': 85, 'std': 20},
     'fixed': {'mean': 125, 'std': 30}
 }
 
