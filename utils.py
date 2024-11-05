@@ -2,13 +2,38 @@ import matplotlib as mpl
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
+import os
 
 # Change default DPI for all plots
 mpl.rcParams['figure.dpi'] = 150
 
-def tabulate_improvements(state: pd.DataFrame, idle: pd.DataFrame, 
-                          pax: pd.DataFrame, trips: pd.DataFrame, on_time_bounds: list,
-                          base_scenario: str = 'DN',flex_stops: list = []) -> tuple:
+def read_results(results_path):
+    time_bucket = 30*60
+    idle = pd.read_csv(os.path.join(results_path, 'idle.csv'))
+    pax = pd.read_csv(os.path.join(results_path, 'pax.csv'))
+    pax['bucket'] = pax['arrival_time'] // time_bucket
+    state = pd.read_csv(os.path.join(results_path, 'state.csv'))
+    trips = pd.read_csv(os.path.join(results_path, 'trips.csv'))
+    trips['delay'] = trips['arrival_time'] - trips['scheduled_time']
+    trips['bucket'] = trips['arrival_time'] // time_bucket
+    create_field_from_list_column(state, 4, 'delay')
+    create_field_from_list_column(state, 1, 'n_requests')
+    create_field_from_list_column(state, 0, 'denied', field_name='unweighted_rewards')
+    create_field_from_list_column(state, 1, 'early', field_name='unweighted_rewards')
+    create_field_from_list_column(state, 2, 'late', field_name='unweighted_rewards')
+    return idle, pax, state, trips
+
+
+def tabulate_improvements(results_path, on_time_bounds: list, base_scenario: str = 'ND',
+                          flex_stops: list = [], start_time: int = 0, 
+                          end_time: int = 10000) -> tuple:
+    idle, pax, state, trips = read_results(results_path)
+    # Filter DataFrames to the specified time range
+    idle = idle[(idle['time'] >= start_time) & (idle['time'] <= end_time)]
+    pax = pax[(pax['arrival_time'] >= start_time) & (pax['arrival_time'] <= end_time)]
+    trips = trips[(trips['arrival_time'] >= start_time) & (trips['arrival_time'] <= end_time)]
+    state = state[(state['time'] >= start_time) & (state['time'] <= end_time)]
+
     # Group and aggregate results for each DataFrame
     n_denied = pax[pax['boarding_time'].isna()].groupby(['scenario']).size()
     idle_sum = (idle.groupby(['scenario'])['idle_time'].sum()/60/60).round(2)
@@ -27,12 +52,9 @@ def tabulate_improvements(state: pd.DataFrame, idle: pd.DataFrame,
     avg_reward = state.groupby(['scenario'])['reward'].mean().round(3)
     avg_episode_reward = state.groupby(['scenario', 'episode'])['reward'].sum()
     avg_episode_reward = avg_episode_reward.groupby('scenario').mean().round(3)
-    ## get mean delay where delay is the difference between arrival time and scheduled time 
-    
 
     # Create a DataFrame with all the metrics
     result_df = pd.DataFrame({
-        # 'n_lates': n_lates,
         'idle_time': idle_sum,
         'wait_time': wait_time_mean,
         'headway_cv': headway_cv,

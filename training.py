@@ -95,19 +95,7 @@ def grid_search_flexsim(
     
     return results
 
-# Example usage:
-results, best_params, best_reward = grid_search_flexsim(
-    learning_rate_range=(0.0003, 0.0007, 0.0001),
-    total_timesteps_range=(14000, 18000, 2000),
-    gamma_range=(0.98, 1.0, 0.01),
-    clip_range_range=(0.15, 0.25, 0.05)
-)
 
-df_results = pd.DataFrame(results)
-df_results.to_csv('outputs/grid_search_results.csv', index=False)
-
-print("\nBest parameters:", best_params)
-print("Best reward:", best_reward)
 
 # Run the training with the default parameters
 # train_flexsim(save=True, test=True)

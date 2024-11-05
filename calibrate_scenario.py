@@ -2,7 +2,6 @@ from objects import EnvironmentManager
 from helpers import *
 import os
 from datetime import datetime
-from rl_env import *
 
 ## Experimental Design Parameters
 N_EPISODES = 30
@@ -58,7 +57,7 @@ if __name__ == '__main__':
 now = datetime.now()
 
 # Format the folder name as 'experiments_MMDD-HHMMSS'
-folder_name = now.strftime("experiments_%m%d-%H%M%S")
+folder_name = now.strftime(f"{SCENARIO}_calibration_experiments_%m%d-%H%M%S")
 
 # Define the path where you want to create the folder
 folder_path = os.path.join(OUTPUT_FOLDER_PATH, folder_name)

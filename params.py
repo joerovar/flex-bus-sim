@@ -5,6 +5,8 @@ PATH_STOPS = 'data/stops.csv'
 MAX_TIME_HOURS = 4.0 # hours
 BUFFER_SECONDS = 3600 # seconds
 N_VEHICLES = 2
+RESULTS_START_TIME_MINUTES = 30
+RESULTS_END_TIME_MINUTES = 180
 
 ## route layout
 N_STOPS = 7

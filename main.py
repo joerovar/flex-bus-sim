@@ -57,10 +57,12 @@ if __name__ == '__main__':
 
         obs, info = rl_env.reset()
         action, _ = model.predict(obs, deterministic=True)
+        action = int(action[0])
         obs, reward, terminated, truncated, info = rl_env.step(action=action)
         while not terminated:
             # Use the loaded agent to predict the action based on current observation
             action, _ = model.predict(obs, deterministic=True)
+            action = int(action[0])
             obs, reward, terminated, truncated, info = rl_env.step(action=action)
 
         pax_hist = get_pax_hist(rl_env.env.route, FLEX_STOPS, include_denied=True)
