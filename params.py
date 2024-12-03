@@ -14,7 +14,7 @@ FLEX_STOPS = [2, 4]
 CONTROL_STOPS = [i-1 for i in FLEX_STOPS]
 
 ## travel/dwell times
-STATIC_DWELL = 7 # seconds
+STATIC_DWELL = 6 # seconds
 DYNAMIC_DWELL = 2 # seconds
 SEGMENT_TIMES = {
     'flex': {'mean': 85, 'std': 20},
@@ -65,7 +65,7 @@ ON_TIME_BOUNDS = (-60, 120) ## seconds
 REWARD_WEIGHTS = {
     'denied': 1.0,
     'early': 1.0,
-    'late': 3.0
+    'late': 2.5
 }
 
 ## SELECTIVE DEVIATION PARAMETERS
@@ -73,7 +73,7 @@ DELAY_THRESHOLD = 60
 
 ## DYNAMIC SMART GREEDY PARAMETERS
 ## define list where each item is the (max_delay, pax_threshold)
-DEFAULT_MIN_PAX_THRESHOLDS = [(0, 1), (90, 2), (180, 4) ,(1000, 5)]
+DEFAULT_MIN_PAX_THRESHOLDS = [(0, 1), (60, 2), (120, 4) ,(1000, 5)]
 
 ## PATHS FOR OUTPUT
 OUTPUT_FOLDER_PATH = 'outputs/'
