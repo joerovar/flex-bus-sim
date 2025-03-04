@@ -63,9 +63,8 @@ ON_TIME_BOUNDS = (-60, 120) ## seconds
 # Define the bounds for each state variable in the environment
 
 REWARD_WEIGHTS = {
-    'denied': 1.0,
-    'early': 1.0,
-    'late': 2.5
+    'lost_requests': -1.0,
+    'off_schedule_trips': -1.0
 }
 
 ## SELECTIVE DEVIATION PARAMETERS
@@ -74,6 +73,7 @@ DELAY_THRESHOLD = 60
 ## DYNAMIC SMART GREEDY PARAMETERS
 ## define list where each item is the (max_delay, pax_threshold)
 DEFAULT_MIN_PAX_THRESHOLDS = [(0, 1), (60, 2), (120, 4) ,(1000, 5)]
+DEFAULT_MIN_PAX_PER_SCHEDULE_DEV = 1.0
 
 ## PATHS FOR OUTPUT
 OUTPUT_FOLDER_PATH = 'outputs/'

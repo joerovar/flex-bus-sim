@@ -160,8 +160,9 @@ def lognormal_sample(stats):
     sigma = np.sqrt(np.log(1 + (std**2 / mean**2)))
     return round(np.random.lognormal(mu, sigma),0)
 
-def get_pax_hist(route, flex_stops, include_denied=False):
-    pax_hist = {'direction': [], 'origin': [], 'destination': [], 'arrival_time': [], 'boarding_time': [], 'alight_time': []}
+def get_pax_history(route, flex_stops, include_denied=False):
+    pax_hist = {'direction': [], 'origin': [], 'destination': [], 
+                'arrival_time': [], 'boarding_time': [], 'alight_time': []}
 
     for pax in route.archived_pax:
         pax_hist['direction'].append(pax.direction)
@@ -172,7 +173,7 @@ def get_pax_hist(route, flex_stops, include_denied=False):
         pax_hist['alight_time'].append(pax.alight_time)
 
     if include_denied:
-        for pax in route.denied_flex_pax:
+        for pax in route.lost_requests:
             pax_hist['direction'].append(pax.direction)
             pax_hist['origin'].append(pax.origin)
             pax_hist['destination'].append(pax.destination)
@@ -219,45 +220,26 @@ def convert_duration_string_to_minutes(duration_str):
 def pct_change(val_from, val_to, decimals=2):
     return round((val_to - val_from) / val_from, decimals)
 
-def get_min_pax_threshold(delay, min_pax_thresholds):
-    if delay < min_pax_thresholds[0][0]:
-        return min_pax_thresholds[0][1]
-    elif delay < min_pax_thresholds[1][0]:
-        return min_pax_thresholds[1][1]
-    elif delay < min_pax_thresholds[2][0]:
-        return min_pax_thresholds[2][1]
-    else:
-        return min_pax_thresholds[3][1]
-    
-def plot_min_pax_threshold(min_pax_thresholds):
-    fig, axs = plt.subplots(figsize=(4, 3))
-    delays = np.arange(-120, 400, 5)
-    thresholds = [get_min_pax_threshold(delay, min_pax_thresholds) for delay in delays]
-    axs.plot(delays/60, thresholds)
-    axs.set_xlabel('Delay (minutes)')
-    axs.set_ylabel('Minimum Pax Threshold')
-    axs.set_title('Pax thresholds for Dynamic Rule Deviation (DRD)')
-    plt.show()
-
-
-def get_action(policy, obs=None, min_pax_thresholds=None):
+def get_action(policy, obs=None, min_pax_per_sched_dev=None):
     if policy == 'ND':
         return 0 ## never deviate
     elif policy == 'AD':
         return 1
     elif policy == 'RA':
         return np.random.choice([0,1])
-    elif policy == 'FRD':
-        delay = obs[4]
-        if delay < DELAY_THRESHOLD:
-            return 1
-        else:
-            return 0
     elif policy == 'DRD':
-        delay = obs[4]
+        schedule_deviation = obs[4] / 60 # convert to minutes
         n_pax = obs[1]
-        min_pax = get_min_pax_threshold(delay, min_pax_thresholds)
+        min_pax = schedule_deviation*min_pax_per_sched_dev
         if n_pax >= min_pax:
             return 1
         else:
             return 0
+
+def get_reward(info, reward_weights):
+    lost_requests = info['lost_requests']    
+    off_schedule_trips = info['off_schedule_trips']
+    unweighted_rewards = [lost_requests, off_schedule_trips]
+    weighted_rewards = [reward_weights['lost_requests'] * lost_requests, reward_weights['off_schedule_trips'] * off_schedule_trips]
+    reward = np.float32(sum(weighted_rewards))
+    return reward, unweighted_rewards

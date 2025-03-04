@@ -7,10 +7,11 @@ from itertools import product
 import numpy as np
 
 # function to train a simple PPO agent on the FlexSim environment
-def train_flexsim(n_steps=64, total_timesteps=1200, 
-                  verbose=0, save=False, test=False, learning_rate=0.0003, gamma=0.99, clip_range=0.2):
-    env = Monitor(FlexSimEnv())
-    # env = FlexSimEnv()
+def train_flexsim(reward_weights, n_steps=64, total_timesteps=1200, 
+                  verbose=0, save=False, test=False, 
+                  learning_rate=0.0003, gamma=0.99, clip_range=0.2):
+    env = Monitor(FlexSimEnv(reward_weights=reward_weights))
+    
     env.reset()
 
     # Initialize the PPO agent with specified n_steps and verbosity
@@ -30,8 +31,10 @@ def train_flexsim(n_steps=64, total_timesteps=1200,
 
     # Save the agent if save=True
     if save:
-        model.save("models/ppo_flexsim")
-        print("Agent saved as 'ppo_flexsim'.")
+        weight_off_trips = str(int(reward_weights['off_schedule_trips']*-10))
+        model_path = "models/ppo_" + weight_off_trips
+        model.save(model_path)
+        print(f"Agent saved in {model_path}.")
 
 def grid_search_flexsim(
     learning_rate_range=(0.0003, 0.0006, 0.0001),
@@ -95,10 +98,13 @@ def grid_search_flexsim(
     
     return results
 
-
-
 # Run the training with the default parameters
 # train_flexsim(save=True, test=True)
 
 # Run the training with the default parameters or pass specific values for testing
 # train_flexsim(n_steps=256, total_timesteps=16000, verbose=0, save=False, test=True, learning_rate=0.00031, gamma=0.99, clip_range=0.2)
+
+# train for different reward weights
+off_schedule_trip_weights = [-0.5, -0.7, -1.0, -2.0, -3.0]
+for weight in off_schedule_trip_weights:
+    train_flexsim({'off_schedule_trips': weight, 'lost_requests': -1.0}, total_timesteps=16000, save=True, test=True)

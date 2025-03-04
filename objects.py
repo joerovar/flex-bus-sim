@@ -74,13 +74,12 @@ class RouteManager:
 
         self.archived_pax = []
         self.schedule = Schedule()
-        self.denied_flex_pax = []
+        self.lost_requests = []
         self.inter_event = {
-            'denied': 0,
+            'lost_requests': 0,
             'fixed_wait_time': 0,
             'fixed_boardings': 0,
-            'early_trips': 0,
-            'late_trips': 0,
+            'off_schedule_trips': 0,
             'total_trips': 0
         }
 
@@ -107,9 +106,9 @@ class RouteManager:
             for i in range(len(set_stops)):
                 ## discard first if flex
                 if i in FLEX_STOPS and REMOVE_LONG_WAIT_FLEX:
-                    denied_flex_pax = self.stops[direction][i].remove_long_wait_pax(time_now)
-                    self.denied_flex_pax += denied_flex_pax
-                    self.inter_event['denied'] += len(denied_flex_pax)
+                    lost_requests = self.stops[direction][i].remove_long_wait_pax(time_now)
+                    self.lost_requests += lost_requests
+                    self.inter_event['lost_requests'] += len(lost_requests)
 
                 self.stops[direction][i].move_to_active_pax(time_now)
 
@@ -132,27 +131,7 @@ class RouteManager:
         excess_wait_time = max(0, excess_wait_time)
         return excess_wait_time
 
-    def get_reward(self, event):
-        ## reward 1: denied passengers
-        denied_pax = self.inter_event['denied']
-        reward_denied = -1 * denied_pax * REWARD_WEIGHTS['denied']
-        
-        ## reward 2: fixed wait time
-        # excess_wait_time = self.get_excess_wait_time()
-        # reward_2 = excess_wait_time * REWARD_WEIGHTS['fixed_wait_time']
-        
-        early_trips = self.inter_event['early_trips']
-        reward_early_trips = -1 * early_trips * REWARD_WEIGHTS['early']
-        
-        late_trips = self.inter_event['late_trips']
-        reward_late_trips = -1 * late_trips * REWARD_WEIGHTS['late']
 
-        unweighted_rewards = [denied_pax, early_trips, late_trips]
-        event.state_hist['unweighted_rewards'].append(unweighted_rewards)
-
-        reward = np.float32(reward_denied + reward_early_trips + reward_late_trips)
-        event.state_hist['reward'].append(reward)
-        return reward
     
     def get_n_waiting_pax(self, stop_idx, direction):
         return len(self.stops[direction][stop_idx].active_pax)
@@ -211,10 +190,8 @@ class Vehicle:
 
         ## update the on-time arrivals counter
         delay = self.event['next']['time'] - next_schd_time
-        if delay > ON_TIME_BOUNDS[1]:
-            route.inter_event['late_trips'] += 1
-        if delay < ON_TIME_BOUNDS[0]:
-            route.inter_event['early_trips'] += 1
+        if delay > ON_TIME_BOUNDS[1] or delay < ON_TIME_BOUNDS[0]:
+            route.inter_event['off_schedule_trips'] += 1
 
         ## update the total trips
         route.inter_event['total_trips'] += 1
@@ -234,7 +211,6 @@ class Vehicle:
         self.event_hist['stop'].append(self.event['next']['stop'])
         self.event_hist['arrival_time'].append(time_now)
         self.event_hist['scheduled_time'].append(route.get_scheduled_time(self.event['next']['stop'], self.trip_idx, self.direction))
-
         
         ## process
         is_flex = self.event['next']['stop'] in FLEX_STOPS
@@ -293,21 +269,31 @@ class Vehicle:
 
 
 class EnvironmentManager:
-    def __init__(self, agents='independent') -> None:
+    def __init__(self, reward_weights=REWARD_WEIGHTS) -> None:
         start_time = 0
         self.timestamps = [start_time]
 
         self.done = 0
         self.requires_control = 0
         self.veh_idx = None
-        self.state_hist = {'time': [],'observation': [], 'action': [], 'reward': [], 'unweighted_rewards': []}
-        self.agents = agents
+        self.state_hist = {'time': [],'observation': [], 'action': [], 
+                           'reward': [], 'unweighted_rewards': []}
         self.route = RouteManager()
+        self.reward_weights = reward_weights
     
     def start_vehicles(self):
         for vehicle in self.route.vehicles:
             vehicle.start(self.route)
-
+    
+    def get_history(self):
+        history = {}
+        history['pax'] = get_pax_history(self.route, FLEX_STOPS, include_denied=True)
+        history['vehicles'] = get_vehicle_history(self.route.vehicles, FLEX_STOPS)
+        # print([len(self.state_hist[ky]) for ky in self.state_hist])
+        history['state'] = pd.DataFrame(self.state_hist)
+        history['idle'] = pd.DataFrame(self.route.idle_time)
+        return history
+        
     def step(self, action=None):
         if action is not None:
             ## update
@@ -336,10 +322,12 @@ class EnvironmentManager:
         if observation is not None:           
             ## reward
             if self.state_hist['observation']:
-                reward = self.route.get_reward(self)
+                info = self.route.inter_event
+                reward, unweighted_rewards = get_reward(info, self.reward_weights)
+                self.state_hist['reward'].append(reward)
+                self.state_hist['unweighted_rewards'].append(unweighted_rewards)
             else:
-                reward = np.nan
-
+                reward, unweighted_rewards = np.nan, np.nan
             info = self.route.inter_event.copy()
             ## add time
             info['time'] = time_now
