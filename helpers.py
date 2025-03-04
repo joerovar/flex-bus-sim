@@ -128,13 +128,14 @@ def pax_activity(vehicle, route, static_dwell, dynamic_dwell, time_now, is_flex)
 
 def get_observation(vehicle: object, route: object, control_stops: list):
     ## get stop, direction, and next flex stop of vehicle
-    stop_idx, direction = vehicle.get_location()
+    direction, stop_idx = vehicle.get_location()
     if stop_idx not in control_stops:
         return None
     flex_stop_idx = stop_idx + 1
     control_stop = route.stops[direction][stop_idx]
+    control_stop_index = get_control_stop_index((direction, stop_idx))
     flex_stop = route.stops[direction][flex_stop_idx]
-    n_flex_pax = route.get_n_waiting_pax(flex_stop_idx, direction)
+    n_requests = route.get_n_waiting_pax(flex_stop_idx, direction)
 
     ## check conditions
     is_departing = vehicle.event['next']['type'] == 'depart'
@@ -143,12 +144,10 @@ def get_observation(vehicle: object, route: object, control_stops: list):
 
     if is_departing and flex_pax_waiting and not_first_arrival:
         observation = [
-            np.int32(stop_idx), 
-            np.int32(n_flex_pax), 
-            np.int32(len(vehicle.pax)), 
+            np.int32(control_stop_index), 
+            np.int32(n_requests),
             np.float32(control_stop.get_latest_headway()), 
-            np.float32(vehicle.get_latest_delay()),
-            np.int32(control_stop.last_action)
+            np.float32(vehicle.get_latest_schedule_deviation())
         ]
         return observation
     return None
@@ -220,7 +219,7 @@ def convert_duration_string_to_minutes(duration_str):
 def pct_change(val_from, val_to, decimals=2):
     return round((val_to - val_from) / val_from, decimals)
 
-def get_action(policy, obs=None, min_pax_per_sched_dev=None):
+def get_action(policy, observation=None, min_pax_per_sched_dev=None):
     if policy == 'ND':
         return 0 ## never deviate
     elif policy == 'AD':
@@ -228,10 +227,10 @@ def get_action(policy, obs=None, min_pax_per_sched_dev=None):
     elif policy == 'RA':
         return np.random.choice([0,1])
     elif policy == 'DRD':
-        schedule_deviation = obs[4] / 60 # convert to minutes
-        n_pax = obs[1]
+        schedule_deviation = observation[3] / 60 # convert to minutes
+        n_requests = observation[1]
         min_pax = schedule_deviation*min_pax_per_sched_dev
-        if n_pax >= min_pax:
+        if n_requests >= min_pax:
             return 1
         else:
             return 0
@@ -243,3 +242,6 @@ def get_reward(info, reward_weights):
     weighted_rewards = [reward_weights['lost_requests'] * lost_requests, reward_weights['off_schedule_trips'] * off_schedule_trips]
     reward = np.float32(sum(weighted_rewards))
     return reward, unweighted_rewards
+
+def get_control_stop_index(direction_stop: tuple):
+    return CONTROL_STOP_CONVERSION[direction_stop]

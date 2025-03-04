@@ -25,10 +25,10 @@ if __name__ == '__main__':
             env.start_vehicles()
             env.route.load_all_pax()
 
-            obs, reward, terminated, truncated, info = env.step(action=None)
+            observation, reward, terminated, truncated, info = env.step(action=None)
             while not terminated:
-                action = get_action(scenario, obs)
-                obs, reward, terminated, truncated, info = env.step(action=action)
+                action = get_action(scenario)
+                observation, reward, terminated, truncated, info = env.step(action=action)
     
             history = env.get_history()
             for key in history:
@@ -46,10 +46,10 @@ if __name__ == '__main__':
             env.start_vehicles()
             env.route.load_all_pax()
 
-            obs, reward, terminated, truncated, info = env.step(action=None)
+            observation, reward, terminated, truncated, info = env.step(action=None)
             while not terminated:
-                action = get_action('DRD', obs, min_pax)
-                obs, reward, terminated, truncated, info = env.step(action=action)
+                action = get_action('DRD', observation, min_pax)
+                observation, reward, terminated, truncated, info = env.step(action=action)
     
             history = env.get_history()
             for key in history:
@@ -65,15 +65,15 @@ if __name__ == '__main__':
         for i in range(N_EPISODES):
             rl_env = FlexSimEnv()
 
-            obs, info = rl_env.reset()
-            action, _ = model.predict(obs, deterministic=True)
+            observation, info = rl_env.reset()
+            action, _ = model.predict(observation, deterministic=True)
             action = int(action[0])
-            obs, reward, terminated, truncated, info = rl_env.step(action=action)
+            observation, reward, terminated, truncated, info = rl_env.step(action=action)
             while not terminated:
                 # Use the loaded agent to predict the action based on current observation
-                action, _ = model.predict(obs, deterministic=True)
+                action, _ = model.predict(observation, deterministic=True)
                 action = int(action[0])
-                obs, reward, terminated, truncated, info = rl_env.step(action=action)
+                observation, reward, terminated, truncated, info = rl_env.step(action=action)
 
             history = rl_env.env.get_history()
             for key in history:

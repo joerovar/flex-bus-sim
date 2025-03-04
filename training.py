@@ -105,6 +105,6 @@ def grid_search_flexsim(
 # train_flexsim(n_steps=256, total_timesteps=16000, verbose=0, save=False, test=True, learning_rate=0.00031, gamma=0.99, clip_range=0.2)
 
 # train for different reward weights
-off_schedule_trip_weights = [-0.5, -0.7, -1.0, -2.0, -3.0]
+off_schedule_trip_weights = [-0.7, -1.0, -2.0, -3.0]
 for weight in off_schedule_trip_weights:
     train_flexsim({'off_schedule_trips': weight, 'lost_requests': -1.0}, total_timesteps=16000, save=True, test=True)

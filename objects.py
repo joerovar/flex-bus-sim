@@ -17,8 +17,6 @@ class Stop:
         self.inactive_pax_arrival_times = np.array([]) ## to easily filter
         self.direction = direction
         self.last_arrival_time = []
-        ## only for control stops
-        self.last_action = 0
     
     def move_to_active_pax(self, time_now):
         for dest_idx in range(len(self.inactive_pax_arrival_times)):
@@ -244,9 +242,6 @@ class Vehicle:
 
         stop = self.event['next']['stop']
 
-        ## record action
-        route.stops[self.direction][self.event['next']['stop']].last_action = deviate
-
         if (not deviate) and (stop in CONTROL_STOPS):
             ## advance to next fixed stop (two stops ahead)
             self.event['next']['stop'] += 2
@@ -261,11 +256,11 @@ class Vehicle:
         
         self.event['next']['time'] = time_now + run_time
 
-    def get_latest_delay(self):
+    def get_latest_schedule_deviation(self):
         return self.event_hist['arrival_time'][-1] - self.event_hist['scheduled_time'][-1]
     
     def get_location(self):
-        return self.event['next']['stop'], self.direction
+        return self.direction, self.event['next']['stop']
 
 
 class EnvironmentManager:
@@ -352,10 +347,6 @@ class EnvironmentManager:
             self.state_hist['observation'].append(observation)
             self.state_hist['time'].append(time_now)
             terminated, truncated = 0, 0
-            # vehicle_state_hist = route.vehicles[self.veh_idx].state_hist
-            # if len(vehicle_state_hist['observation']):
-            #     ## update the reward for the vehicle
-            #     pass
             return observation, reward, terminated, truncated, info
                 
         ## if no control required 
