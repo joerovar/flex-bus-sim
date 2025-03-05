@@ -17,7 +17,7 @@ CONTROL_STOPS = [i-1 for i in FLEX_STOPS]
 STATIC_DWELL = 6 # seconds
 DYNAMIC_DWELL = 2 # seconds
 SEGMENT_TIMES = {
-    'flex': {'mean': 85, 'std': 20},
+    'flex': {'mean': 80, 'std': 20},
     'fixed': {'mean': 125, 'std': 30}
 }
 
@@ -35,8 +35,8 @@ SCHEDULED_STOP_TIMES = [
     600]
 
 ## demand parameters
-OD_LOW = 3.5
-OD_HIGH = 6.5
+OD_LOW = 3.0
+OD_HIGH = 6.0
 
 OD_MATRIX = [
     [0, OD_LOW, 0, OD_HIGH, 0, OD_HIGH, 0],
@@ -58,7 +58,7 @@ CONTROL_STOP_CONVERSION = {
 ## additional parameters
 
 ## the amount of time a flex passenger is willing to wait
-MAX_WAIT_TIME_FLEX = 10 # minutes
+MAX_WAIT_TIME_FLEX = 15 # minutes
 ## boolean indicates whether to remove passengers waiting more than MAX_WAIT_TIME_FLEX
 REMOVE_LONG_WAIT_FLEX = True
 

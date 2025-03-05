@@ -25,9 +25,6 @@ def train_flexsim(reward_weights, n_steps=64, total_timesteps=1200,
         # Evaluate the agent
         mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=30)
         print(f"Mean reward: {round(mean_reward, 3)} +/- {round(std_reward, 3)}")
-        print('hyperpatemers')
-        print(learning_rate, gamma, clip_range)
-        print('------')
 
     # Save the agent if save=True
     if save:
@@ -35,35 +32,31 @@ def train_flexsim(reward_weights, n_steps=64, total_timesteps=1200,
         model_path = "models/ppo_" + weight_off_trips
         model.save(model_path)
         print(f"Agent saved in {model_path}.")
+    print('------')
 
 def grid_search_flexsim(
-    learning_rate_range=(0.0003, 0.0006, 0.0001),
-    total_timesteps_range=(12000, 16000, 2000),
-    gamma_range=(0.98, 0.99, 0.01),
-    clip_range_range=(0.15, 0.2, 0.05),
-    n_steps=256,
+    lr_values=[0.0005, 0.0006],# learning rate
+    ts_values=[24000, 28000],# timesteps
+    gamma_values=[0.98, 0.99],# discount factor
+    clip_values=[0.2],
+    n_steps_values=[128, 256],
     verbose=0
-):
-    # Generate parameter combinations
-    lr_values = np.arange(*learning_rate_range)
-    ts_values = np.arange(*total_timesteps_range)
-    gamma_values = np.arange(*gamma_range)
-    clip_values = np.arange(*clip_range_range)
-    
+):  
     # Dictionary to store results
     results = {
         'lr': [],
         'ts': [],
         'gamma': [],
         'clip': [],
+        'n_steps': [],
         'mean_reward': [],
         'std_reward': []
     }
-    best_reward = float('-inf')
     
     # Grid search
-    for lr, ts, gamma, clip in product(lr_values, ts_values, gamma_values, clip_values):
+    for lr, ts, gamma, clip, n_steps in product(lr_values, ts_values, gamma_values, clip_values, n_steps_values):
         # Train model with current parameters
+        np.random.seed(0)
         env = Monitor(FlexSimEnv(reward_weights={'off_schedule_trips': -2.0, 'lost_requests': -1.0}))
         model = PPO("MultiInputPolicy", env, verbose=verbose, 
                    n_steps=n_steps, 
@@ -83,13 +76,8 @@ def grid_search_flexsim(
         results['clip'].append(clip)
         results['mean_reward'].append(mean_reward)
         results['std_reward'].append(std_reward)
-        
-        # Update best model if current is better
-        if mean_reward > best_reward:
-            best_reward = mean_reward
-            # Save current best model
-            model.save("models/ppo_flexsim")
-            
+        results['n_steps'].append(n_steps)       
+ 
         print(f"Params: lr={lr}, ts={ts}, gamma={gamma}, clip={clip}, n_steps={n_steps}")
         print(f"Reward: {round(mean_reward, 3)} +/- {round(std_reward, 3)}")
         print("------------------------")
@@ -102,9 +90,5 @@ def grid_search_flexsim(
 # train_flexsim(save=True, test=True)
 
 # Run the training with the default parameters or pass specific values for testing
-# train_flexsim(n_steps=256, total_timesteps=16000, verbose=0, save=False, test=True, learning_rate=0.00031, gamma=0.99, clip_range=0.2)
+# train_flexsim(n_steps=256, total_timesteps=16000, verbose=0, save=False, test=True, learning_rate=0.0005, gamma=0.99, clip_range=0.2)
 
-# train for different reward weights
-# off_schedule_trip_weights = [-1.0, -2.0, -2.5, -3.0]
-# for weight in off_schedule_trip_weights:
-#     train_flexsim({'off_schedule_trips': weight, 'lost_requests': -1.0}, total_timesteps=32000, save=True, test=True)
