@@ -197,7 +197,7 @@ def get_vehicle_history(vehicle_list, flex_stop_list):
     veh_hist = []
     for veh in vehicle_list:
         df = pd.DataFrame(veh.event_hist)
-        df['veh_id'] = veh.idx
+        df['veh_idx'] = veh.idx
         veh_hist.append(df)
     veh_df = pd.concat(veh_hist, ignore_index=True)
     veh_df['headway'] = veh_df.groupby(['direction', 'stop'])['arrival_time'].transform(lambda x: x.sort_values().diff())

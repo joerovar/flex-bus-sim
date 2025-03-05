@@ -255,8 +255,8 @@ class EnvironmentManager:
         self.done = 0
         self.requires_control = 0
         self.veh_idx = None
-        self.state_hist = {'time': [], 'veh_idx': [], 'observation': [], 'action': [], 
-                           'reward': [], 'unweighted_rewards': []}
+        self.state_hist = [{'time': [], 'observation': [], 'action': [], 
+                           'reward': [], 'unweighted_rewards': []} for i in range(N_VEHICLES)]
         self.route = RouteManager()
         self.reward_weights = reward_weights
     
@@ -268,14 +268,26 @@ class EnvironmentManager:
         history = {}
         history['pax'] = get_pax_history(self.route, FLEX_STOPS, include_denied=True)
         history['vehicles'] = get_vehicle_history(self.route.vehicles, FLEX_STOPS)
-        history['state'] = pd.DataFrame(self.state_hist)
+        
+        state_histories = []
+        for i in range(N_VEHICLES):
+            if len(self.state_hist[i]['observation']) != len(self.state_hist[i]['reward']):
+                self.state_hist[i]['time'].pop(-1)
+                self.state_hist[i]['observation'].pop(-1)
+                self.state_hist[i]['action'].pop(-1)
+            state_hist = pd.DataFrame(self.state_hist[i])
+            state_hist['veh_idx'] = i
+            state_histories.append(state_hist)
+        
+        history['state'] = pd.concat(state_histories, ignore_index=True)
+        
         history['idle'] = pd.DataFrame(self.route.idle_time)
         return history
         
     def step(self, action=None):
         if action is not None:
             ## update
-            self.state_hist['action'].append(action)
+            self.state_hist[self.veh_idx]['action'].append(action)
             ## perform event
             self.route.vehicles[self.veh_idx].depart_stop(self.route, deviate=action)
         
@@ -299,24 +311,16 @@ class EnvironmentManager:
 
         if observation is not None:           
             ## reward
-            if self.state_hist['observation']:
+            if self.state_hist[self.veh_idx]['observation']:
                 inter_event_counts = self.route.inter_event[self.veh_idx]
                 reward, unweighted_rewards = get_reward(inter_event_counts, self.reward_weights)
-                self.state_hist['reward'].append(reward)
-                self.state_hist['unweighted_rewards'].append(unweighted_rewards)
-                self.state_hist['veh_idx'].append(self.veh_idx)
+                self.state_hist[self.veh_idx]['reward'].append(reward)
+                self.state_hist[self.veh_idx]['unweighted_rewards'].append(unweighted_rewards)
             else:
                 reward, unweighted_rewards = np.nan, np.nan
             info = self.route.inter_event[self.veh_idx].copy()
             ## add time
             info['time'] = time_now
-            # ## time passed since last event
-            # if self.state_hist['observation']:
-            #     info['time_passed'] = time_now - self.state_hist['time'][-1]
-            #     info['cumul_reward'] = np.sum(self.state_hist['reward'])
-            # else:
-            #     info['time_passed'] = np.nan
-            #     info['cumul_reward'] = np.nan
             ## vehicle index
             info['veh_idx'] = self.veh_idx
             info['direction'] = self.route.vehicles[self.veh_idx].direction
@@ -328,8 +332,8 @@ class EnvironmentManager:
                 terminated, truncated = 1, 1
                 return observation, reward, terminated, truncated, info
             ## bookkeeping
-            self.state_hist['observation'].append(observation)
-            self.state_hist['time'].append(time_now)
+            self.state_hist[self.veh_idx]['observation'].append(observation)
+            self.state_hist[self.veh_idx]['time'].append(time_now)
             terminated, truncated = 0, 0
             return observation, reward, terminated, truncated, info
                 

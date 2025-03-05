@@ -20,7 +20,6 @@ if __name__ == '__main__':
         np.random.seed(0)
 
         for i in range(N_EPISODES):
-            # route = RouteManager()
             env = EnvironmentManager()
             env.start_vehicles()
             env.route.load_all_pax()
@@ -41,7 +40,6 @@ if __name__ == '__main__':
     for min_pax in min_pax_per_sched_dev:
         np.random.seed(0)
         for i in range(N_EPISODES):
-            # route = RouteManager()
             env = EnvironmentManager()
             env.start_vehicles()
             env.route.load_all_pax()
