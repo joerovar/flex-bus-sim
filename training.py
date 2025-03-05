@@ -64,7 +64,7 @@ def grid_search_flexsim(
     # Grid search
     for lr, ts, gamma, clip in product(lr_values, ts_values, gamma_values, clip_values):
         # Train model with current parameters
-        env = Monitor(FlexSimEnv())
+        env = Monitor(FlexSimEnv(reward_weights={'off_schedule_trips': -2.0, 'lost_requests': -1.0}))
         model = PPO("MultiInputPolicy", env, verbose=verbose, 
                    n_steps=n_steps, 
                    learning_rate=lr,
@@ -90,7 +90,7 @@ def grid_search_flexsim(
             # Save current best model
             model.save("models/ppo_flexsim")
             
-        print(f"Params: lr={lr}, ts={ts}, gamma={gamma}, clip={clip}")
+        print(f"Params: lr={lr}, ts={ts}, gamma={gamma}, clip={clip}, n_steps={n_steps}")
         print(f"Reward: {round(mean_reward, 3)} +/- {round(std_reward, 3)}")
         print("------------------------")
         
@@ -105,6 +105,6 @@ def grid_search_flexsim(
 # train_flexsim(n_steps=256, total_timesteps=16000, verbose=0, save=False, test=True, learning_rate=0.00031, gamma=0.99, clip_range=0.2)
 
 # train for different reward weights
-off_schedule_trip_weights = [-0.7, -1.0, -2.0, -3.0]
-for weight in off_schedule_trip_weights:
-    train_flexsim({'off_schedule_trips': weight, 'lost_requests': -1.0}, total_timesteps=16000, save=True, test=True)
+# off_schedule_trip_weights = [-1.0, -2.0, -2.5, -3.0]
+# for weight in off_schedule_trip_weights:
+#     train_flexsim({'off_schedule_trips': weight, 'lost_requests': -1.0}, total_timesteps=32000, save=True, test=True)

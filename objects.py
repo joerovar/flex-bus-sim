@@ -73,13 +73,7 @@ class RouteManager:
         self.archived_pax = []
         self.schedule = Schedule()
         self.lost_requests = []
-        self.inter_event = {
-            'lost_requests': 0,
-            'fixed_wait_time': 0,
-            'fixed_boardings': 0,
-            'off_schedule_trips': 0,
-            'total_trips': 0
-        }
+        self.inter_event = [{'lost_requests': 0, 'off_schedule_trips': 0, 'total_trips': 0} for i in range(N_VEHICLES)]
 
     def load_all_pax(self):
         for direction in self.stops:
@@ -106,8 +100,8 @@ class RouteManager:
                 if i in FLEX_STOPS and REMOVE_LONG_WAIT_FLEX:
                     lost_requests = self.stops[direction][i].remove_long_wait_pax(time_now)
                     self.lost_requests += lost_requests
-                    self.inter_event['lost_requests'] += len(lost_requests)
-
+                    for item in self.inter_event:
+                        item['lost_requests'] += len(lost_requests)
                 self.stops[direction][i].move_to_active_pax(time_now)
 
     def get_scheduled_time(self, stop_idx, trip_idx, direction):
@@ -122,14 +116,6 @@ class RouteManager:
         trip_idx = self.trip_counter[direction] - 1 ## minus 1 because departures index start from zero
         schd_time = self.schedule.deps[direction][trip_idx]
         return schd_time, trip_idx
-
-    def get_excess_wait_time(self):
-        avg_wait_time = self.inter_event['fixed_wait_time'] / np.max([self.inter_event['fixed_boardings'], 1]) 
-        excess_wait_time = (avg_wait_time/60) - (SCHEDULE_HEADWAY/2)
-        excess_wait_time = max(0, excess_wait_time)
-        return excess_wait_time
-
-
     
     def get_n_waiting_pax(self, stop_idx, direction):
         return len(self.stops[direction][stop_idx].active_pax)
@@ -189,10 +175,8 @@ class Vehicle:
         ## update the on-time arrivals counter
         delay = self.event['next']['time'] - next_schd_time
         if delay > ON_TIME_BOUNDS[1] or delay < ON_TIME_BOUNDS[0]:
-            route.inter_event['off_schedule_trips'] += 1
-
-        ## update the total trips
-        route.inter_event['total_trips'] += 1
+            for item in route.inter_event:
+                item['off_schedule_trips'] += 1
         
         ## update idle time tracker
         idle_time = max(0, next_schd_time - finish_time)
@@ -271,7 +255,7 @@ class EnvironmentManager:
         self.done = 0
         self.requires_control = 0
         self.veh_idx = None
-        self.state_hist = {'time': [],'observation': [], 'action': [], 
+        self.state_hist = {'time': [], 'veh_idx': [], 'observation': [], 'action': [], 
                            'reward': [], 'unweighted_rewards': []}
         self.route = RouteManager()
         self.reward_weights = reward_weights
@@ -284,7 +268,6 @@ class EnvironmentManager:
         history = {}
         history['pax'] = get_pax_history(self.route, FLEX_STOPS, include_denied=True)
         history['vehicles'] = get_vehicle_history(self.route.vehicles, FLEX_STOPS)
-        # print([len(self.state_hist[ky]) for ky in self.state_hist])
         history['state'] = pd.DataFrame(self.state_hist)
         history['idle'] = pd.DataFrame(self.route.idle_time)
         return history
@@ -317,28 +300,29 @@ class EnvironmentManager:
         if observation is not None:           
             ## reward
             if self.state_hist['observation']:
-                info = self.route.inter_event
-                reward, unweighted_rewards = get_reward(info, self.reward_weights)
+                inter_event_counts = self.route.inter_event[self.veh_idx]
+                reward, unweighted_rewards = get_reward(inter_event_counts, self.reward_weights)
                 self.state_hist['reward'].append(reward)
                 self.state_hist['unweighted_rewards'].append(unweighted_rewards)
+                self.state_hist['veh_idx'].append(self.veh_idx)
             else:
                 reward, unweighted_rewards = np.nan, np.nan
-            info = self.route.inter_event.copy()
+            info = self.route.inter_event[self.veh_idx].copy()
             ## add time
             info['time'] = time_now
-            ## time passed since last event
-            if self.state_hist['observation']:
-                info['time_passed'] = time_now - self.state_hist['time'][-1]
-                info['cumul_reward'] = np.sum(self.state_hist['reward'])
-            else:
-                info['time_passed'] = np.nan
-                info['cumul_reward'] = np.nan
+            # ## time passed since last event
+            # if self.state_hist['observation']:
+            #     info['time_passed'] = time_now - self.state_hist['time'][-1]
+            #     info['cumul_reward'] = np.sum(self.state_hist['reward'])
+            # else:
+            #     info['time_passed'] = np.nan
+            #     info['cumul_reward'] = np.nan
             ## vehicle index
             info['veh_idx'] = self.veh_idx
             info['direction'] = self.route.vehicles[self.veh_idx].direction
             ## reset counters after using it for reward and info
-            for ky in self.route.inter_event:
-                self.route.inter_event[ky] = 0
+            for ky in self.route.inter_event[self.veh_idx]:
+                self.route.inter_event[self.veh_idx][ky] = 0
 
             if time_now > MAX_TIME_HOURS*60*60 - BUFFER_SECONDS:
                 terminated, truncated = 1, 1

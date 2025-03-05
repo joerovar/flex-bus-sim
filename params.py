@@ -49,10 +49,10 @@ OD_MATRIX = [
 
 # define a conversion from (direction,stop) to control stop index
 CONTROL_STOP_CONVERSION = {
-    (0,1): 0,
-    (0,3): 1,
-    (1,1): 2,
-    (1,3): 3
+    ('out',1): 0,
+    ('out',3): 1,
+    ('in',1): 2,
+    ('in',3): 3
 }
 
 ## additional parameters

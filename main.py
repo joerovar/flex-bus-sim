@@ -10,7 +10,7 @@ N_EPISODES = 25
 
 results = {'pax': [], 'vehicles': [], 'state': [], 'idle': []}
 
-BASE_SCENARIOS = ['RA', 'ND']
+BASE_SCENARIOS = ['RA']
 
 if __name__ == '__main__':
     ## evaluation
@@ -58,7 +58,7 @@ if __name__ == '__main__':
                 results[key].append(history[key])
 
     # RL agent
-    models = ['ppo_10', 'ppo_20', 'ppo_30']
+    models = ['ppo_10', 'ppo_20', 'ppo_25','ppo_30']
     for model_name in models:
         np.random.seed(0)
         model = PPO.load(f'models/{model_name}')

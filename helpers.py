@@ -119,11 +119,6 @@ def pax_activity(vehicle, route, static_dwell, dynamic_dwell, time_now, is_flex)
     vehicle.event_hist['alightings'].append(alightings)
     vehicle.event_hist['load'].append(len(vehicle.pax))
     vehicle.event_hist['departure_time'].append(vehicle.event_hist['arrival_time'][-1] + dwell_time)
-
-    ## update route wait time
-    if not is_flex:
-        route.inter_event['fixed_wait_time'] += wait_time_accumulator ## hours
-        route.inter_event['fixed_boardings'] += boardings
     return dwell_time
 
 def get_observation(vehicle: object, route: object, control_stops: list):
@@ -235,9 +230,10 @@ def get_action(policy, observation=None, min_pax_per_sched_dev=None):
         else:
             return 0
 
-def get_reward(info, reward_weights):
-    lost_requests = info['lost_requests']    
-    off_schedule_trips = info['off_schedule_trips']
+def get_reward(inter_event_counts: dict, reward_weights: dict):
+    lost_requests = inter_event_counts['lost_requests']    
+    off_schedule_trips = inter_event_counts['off_schedule_trips']
+
     unweighted_rewards = [lost_requests, off_schedule_trips]
     weighted_rewards = [reward_weights['lost_requests'] * lost_requests, reward_weights['off_schedule_trips'] * off_schedule_trips]
     reward = np.float32(sum(weighted_rewards))
