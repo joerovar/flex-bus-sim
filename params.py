@@ -18,7 +18,7 @@ STATIC_DWELL = 6 # seconds
 DYNAMIC_DWELL = 2 # seconds
 SEGMENT_TIMES = {
     'flex': {'mean': 80, 'std': 20},
-    'fixed': {'mean': 120, 'std': 30}
+    'fixed': {'mean': 110, 'std': 30}
 }
 
 ## service design

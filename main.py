@@ -55,30 +55,6 @@ if __name__ == '__main__':
                 history[key]['episode'] = i
                 results[key].append(history[key])
 
-    # # RL agent
-    models = ['ppo_16', 'ppo_20', 'ppo_22','ppo_24', 'ppo_28']
-    for model_name in models:
-        np.random.seed(0)
-        model = PPO.load(f'models/{model_name}')
-        for i in range(N_EPISODES):
-            rl_env = FlexSimEnv()
-
-            observation, info = rl_env.reset()
-            action, _ = model.predict(observation, deterministic=True)
-            action = int(action[0])
-            observation, reward, terminated, truncated, info = rl_env.step(action=action)
-            while not terminated:
-                # Use the loaded agent to predict the action based on current observation
-                action, _ = model.predict(observation, deterministic=True)
-                action = int(action[0])
-                observation, reward, terminated, truncated, info = rl_env.step(action=action)
-
-            history = rl_env.env.get_history()
-            for key in history:
-                history[key]['scenario'] = 'RL_' + model_name
-                history[key]['episode'] = i
-                results[key].append(history[key])
-
     # Get the current date and time
     now = datetime.now()
 

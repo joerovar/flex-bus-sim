@@ -1,11 +1,10 @@
-import gymnasium as gym
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from collections import deque, namedtuple
 import random
-from params import N_VEHICLES
+from params import N_VEHICLES, REWARD_WEIGHTS
 from rl_env import FlexSimEnv  # Assuming FlexSimEnv is defined in rl_env.py
 
 # Define the experience tuple structure - include vehicle index for monitoring
@@ -254,8 +253,8 @@ class MultiVehicleTrainer:
             self.scores.append(episode_score)
             
             # Print progress
-            if episode % 10 == 0:
-                print(f"Episode {episode}/{self.num_episodes}, Avg Score: {np.mean(self.scores[-10:]):.2f}, Epsilon: {self.agent.epsilon:.4f}")
+            if episode % 20 == 0:
+                print(f"Episode {episode}/{self.num_episodes}, Avg Score: {np.mean(self.scores[-20:]):.2f}, Epsilon: {self.agent.epsilon:.4f}")
         
         return self.scores
 
@@ -333,7 +332,44 @@ def train_vehicles():
     eval_rewards = evaluate_agent(env, agent)
     
     print(f"\nTraining complete! Final average reward: {np.mean(scores[-100:]):.2f}")
+
+    # save
+    torch.save(agent.qnetwork.state_dict(), 'shared_dqn_agent.pth')
+    print("Model saved as 'shared_dqn_agent.pth'")
     return agent, scores
 
-if __name__ == "__main__":
-    trained_agent, scores = train_vehicles()
+def train_vehicles(reward_weights=REWARD_WEIGHTS):
+    env = FlexSimEnv(reward_weights=reward_weights)
+    state_size = 4  # control_stop_idx, n_requests, headway, schedule_deviation
+    action_size = 2  # binary action
+    
+    agent = SharedDQNAgent(state_size=state_size, action_size=action_size)
+    trainer = MultiVehicleTrainer(env, agent, num_episodes=500)
+    
+    print("Training with shared policy...")
+    scores = trainer.train()
+    
+    print("\nEvaluating trained agent...")
+    eval_rewards = evaluate_agent(env, agent)
+    
+    print(f"\nTraining complete! Final average reward: {np.mean(scores[-100:]):.2f}")
+
+    # save
+    torch.save(agent.qnetwork.state_dict(), 'shared_dqn_agent.pth')
+    print("Model saved as 'shared_dqn_agent.pth'")
+    return agent, scores
+
+def load_agent(model_path):
+    # Initialize a new agent with the same architecture
+    state_size = 4
+    action_size = 2
+    agent = SharedDQNAgent(state_size=state_size, action_size=action_size)
+    
+    # Load the saved state dictionary with weights_only=True to address the warning
+    agent.qnetwork.load_state_dict(torch.load(model_path, weights_only=True))
+    
+    # Set to evaluation mode (disables dropout, etc.)
+    agent.qnetwork.eval()
+    
+    return agent
+

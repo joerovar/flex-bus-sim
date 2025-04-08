@@ -73,7 +73,7 @@ class RouteManager:
         self.archived_pax = []
         self.schedule = Schedule()
         self.lost_requests = []
-        self.inter_event = [{'lost_requests': 0, 'off_schedule_trips': 0, 'total_trips': 0} for i in range(N_VEHICLES)]
+        self.inter_event = [{'lost_requests': 0, 'off_schedule_trips': 0} for _ in range(N_VEHICLES)]
 
     def load_all_pax(self):
         for direction in self.stops:
