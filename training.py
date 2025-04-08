@@ -2,7 +2,6 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.monitor import Monitor
 from rl_env import FlexSimEnv
-import pandas as pd
 from itertools import product
 import numpy as np
 
@@ -35,12 +34,13 @@ def train_flexsim(reward_weights, n_steps=64, total_timesteps=1200,
     print('------')
 
 def grid_search_flexsim(
-    lr_values=[0.0005, 0.0006],# learning rate
-    ts_values=[24000, 28000],# timesteps
-    gamma_values=[0.98, 0.99],# discount factor
+    lr_values=[0.0005, 0.0006], # learning rate
+    ts_values=[24000, 28000], # timesteps
+    gamma_values=[0.98, 0.99], # discount factor
     clip_values=[0.2],
     n_steps_values=[128, 256],
-    verbose=0
+    verbose=0,
+    off_schedule_trip_weight=-2.0,
 ):  
     # Dictionary to store results
     results = {
@@ -57,7 +57,7 @@ def grid_search_flexsim(
     for lr, ts, gamma, clip, n_steps in product(lr_values, ts_values, gamma_values, clip_values, n_steps_values):
         # Train model with current parameters
         np.random.seed(0)
-        env = Monitor(FlexSimEnv(reward_weights={'off_schedule_trips': -2.0, 'lost_requests': -1.0}))
+        env = Monitor(FlexSimEnv(reward_weights={'off_schedule_trips': off_schedule_trip_weight, 'lost_requests': -1.0}))
         model = PPO("MultiInputPolicy", env, verbose=verbose, 
                    n_steps=n_steps, 
                    learning_rate=lr,

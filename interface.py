@@ -1,4 +1,4 @@
-from rl_env import FlexSimEnv, STATE_KEYS
+from rl_env import FlexSimEnv
 
 env = FlexSimEnv()
 obs, info = env.reset()

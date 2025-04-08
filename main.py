@@ -55,7 +55,7 @@ if __name__ == '__main__':
                 history[key]['episode'] = i
                 results[key].append(history[key])
 
-    # RL agent
+    # # RL agent
     models = ['ppo_16', 'ppo_20', 'ppo_22','ppo_24', 'ppo_28']
     for model_name in models:
         np.random.seed(0)

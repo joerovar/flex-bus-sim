@@ -18,7 +18,7 @@ STATIC_DWELL = 6 # seconds
 DYNAMIC_DWELL = 2 # seconds
 SEGMENT_TIMES = {
     'flex': {'mean': 80, 'std': 20},
-    'fixed': {'mean': 125, 'std': 30}
+    'fixed': {'mean': 120, 'std': 30}
 }
 
 ## service design
@@ -35,8 +35,8 @@ SCHEDULED_STOP_TIMES = [
     600]
 
 ## demand parameters
-OD_LOW = 3.0
-OD_HIGH = 6.0
+OD_LOW = 3.5
+OD_HIGH = 6.5
 
 OD_MATRIX = [
     [0, OD_LOW, 0, OD_HIGH, 0, OD_HIGH, 0],
@@ -49,10 +49,10 @@ OD_MATRIX = [
 
 # define a conversion from (direction,stop) to control stop index
 CONTROL_STOP_CONVERSION = {
-    ('out',1): 0,
-    ('out',3): 1,
-    ('in',1): 2,
-    ('in',3): 3
+    ('out', 1): 0,
+    ('out', 3): 1,
+    ('in', 1): 2,
+    ('in', 3): 3
 }
 
 ## additional parameters

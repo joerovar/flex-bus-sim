@@ -296,11 +296,6 @@ class EnvironmentManager:
         ## add new time to list of timestamps
         self.timestamps.append(self.route.vehicles[self.veh_idx].event['next']['time'])
         time_now = self.timestamps[-1]
-    
-        if time_now > MAX_TIME_HOURS*60*60:
-            print('crazy')
-            print(time_now)
-            raise ValueError(f'Time limit exceeded at {time_now}')
 
         ## get all passengers up to the current time
         self.route.get_active_pax(time_now)
@@ -308,9 +303,29 @@ class EnvironmentManager:
         ## check control
         observation = get_observation(
             self.route.vehicles[self.veh_idx], self.route, CONTROL_STOPS)
-
+        
         if observation is not None:           
-            ## reward
+            # if the headway is less than a threshold, we set the next time as the difference
+            headway_threshold = 150 # statistically derived
+            headway = observation[2]
+            diff_headway = headway - headway_threshold
+            if diff_headway < 0:
+                # advance the clock
+                # print(f"held by {diff_headway} seconds")
+                # print(f"because the headway is: {headway}")
+                self.route.vehicles[self.veh_idx].event['next']['time'] += abs(diff_headway)
+                
+                # check if time has exceeded
+                if time_now > MAX_TIME_HOURS*60*60 - BUFFER_SECONDS:
+                    terminated, truncated = 1, 1
+                    reward = 0
+                    info = {}
+                    return observation, reward, terminated, truncated, info
+                
+                # continue to next step
+                return self.step(action=None)
+            
+            # get reward
             if self.state_hist[self.veh_idx]['observation']:
                 inter_event_counts = self.route.inter_event[self.veh_idx]
                 reward, unweighted_rewards = get_reward(inter_event_counts, self.reward_weights)
@@ -318,6 +333,7 @@ class EnvironmentManager:
                 self.state_hist[self.veh_idx]['unweighted_rewards'].append(unweighted_rewards)
             else:
                 reward, unweighted_rewards = np.nan, np.nan
+
             info = self.route.inter_event[self.veh_idx].copy()
             ## add time
             info['time'] = time_now
