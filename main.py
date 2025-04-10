@@ -3,41 +3,18 @@ from helpers import *
 import os
 from datetime import datetime
 from rl_env import *
-from stable_baselines3 import PPO
 
 ## Experimental Design Parameters
 N_EPISODES = 25
 
 results = {'pax': [], 'vehicles': [], 'state': [], 'idle': []}
 
-BASE_SCENARIOS = ['RA']
-
 if __name__ == '__main__':
     ## evaluation
-    # base scenarios
-    for scenario in BASE_SCENARIOS:
-        ## set seeds
-        np.random.seed(0)
-
-        for i in range(N_EPISODES):
-            env = EnvironmentManager()
-            env.start_vehicles()
-            env.route.load_all_pax()
-
-            observation, reward, terminated, truncated, info = env.step(action=None)
-            while not terminated:
-                action = get_action(scenario)
-                observation, reward, terminated, truncated, info = env.step(action=action)
-    
-            history = env.get_history()
-            for key in history:
-                history[key]['scenario'] = scenario
-                history[key]['episode'] = i
-                results[key].append(history[key])
-
     # dynamic rule deviation
-    min_pax_per_sched_dev = [0.0, 0.5, 1.0, 1.5, 2.0, 3.0]
-    for min_pax in min_pax_per_sched_dev:
+    base_minimum_requests = BASE_MINIMUM_REQUEST
+    minimum_request_slopes = [0.0, 0.5, 1.0, 2.0, 2.5, 3.0] 
+    for minimum_request_slope in minimum_request_slopes:
         np.random.seed(0)
         for i in range(N_EPISODES):
             env = EnvironmentManager()
@@ -46,12 +23,12 @@ if __name__ == '__main__':
 
             observation, reward, terminated, truncated, info = env.step(action=None)
             while not terminated:
-                action = get_action('DRD', observation, min_pax)
+                action = get_action('DRD', observation, minimum_request_slope)
                 observation, reward, terminated, truncated, info = env.step(action=action)
     
             history = env.get_history()
             for key in history:
-                history[key]['scenario'] = 'DRD_' + str(int(min_pax*10))
+                history[key]['scenario'] = 'DRD_' + str(int(minimum_request_slope*10))
                 history[key]['episode'] = i
                 results[key].append(history[key])
 

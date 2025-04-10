@@ -214,7 +214,7 @@ def convert_duration_string_to_minutes(duration_str):
 def pct_change(val_from, val_to, decimals=2):
     return round((val_to - val_from) / val_from, decimals)
 
-def get_action(policy, observation=None, min_pax_per_sched_dev=None):
+def get_action(policy, observation=None, minimum_requests_slope=0, base_minimum_requests=0):
     if policy == 'ND':
         return 0 ## never deviate
     elif policy == 'AD':
@@ -224,7 +224,7 @@ def get_action(policy, observation=None, min_pax_per_sched_dev=None):
     elif policy == 'DRD':
         schedule_deviation = observation[3] / 60 # convert to minutes
         n_requests = observation[1]
-        min_pax = schedule_deviation*min_pax_per_sched_dev
+        min_pax = schedule_deviation*minimum_requests_slope + base_minimum_requests
         if n_requests >= min_pax:
             return 1
         else:
