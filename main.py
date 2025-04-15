@@ -5,15 +5,20 @@ from datetime import datetime
 from rl_env import *
 
 ## Experimental Design Parameters
-N_EPISODES = 25
+N_EPISODES = 40
 
 results = {'pax': [], 'vehicles': [], 'state': [], 'idle': []}
+
+# Float to '00' string
+def float_to_string(num):
+    # Format as 2 digits with one decimal place, then remove the decimal point
+    return f"{num:.1f}".replace(".", "")
 
 if __name__ == '__main__':
     ## evaluation
     # dynamic rule deviation
     base_minimum_requests = BASE_MINIMUM_REQUEST
-    minimum_request_slopes = [0.0, 0.5, 1.0, 2.0, 2.5, 3.0] 
+    minimum_request_slopes = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0] 
     for minimum_request_slope in minimum_request_slopes:
         np.random.seed(0)
         for i in range(N_EPISODES):
@@ -28,7 +33,10 @@ if __name__ == '__main__':
     
             history = env.get_history()
             for key in history:
-                history[key]['scenario'] = 'DRD_' + str(int(minimum_request_slope*10))
+                slope = float_to_string(minimum_request_slope)
+
+                # recordings
+                history[key]['scenario'] = 'DRD_' + slope
                 history[key]['episode'] = i
                 results[key].append(history[key])
 

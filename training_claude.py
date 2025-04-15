@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -71,7 +72,7 @@ class SharedDQNAgent:
     def __init__(self, state_size=4, action_size=2, hidden_size=64, 
                  learning_rate=5e-4, gamma=0.99, epsilon_start=1.0,
                  epsilon_min=0.05, buffer_size=10000,
-                 batch_size=64, update_every=4, epsilon_decay_rate=0.999):
+                 batch_size=64, update_every=4, epsilon_decay_rate=0.9995):
         
         # Initialize a single shared Q-Network for all vehicles
         self.qnetwork = QNetwork(state_size, action_size, hidden_size)
@@ -117,6 +118,10 @@ class SharedDQNAgent:
         veh_idx is accepted but ignored for action selection since policy is shared.
         It's kept for consistency with the environment interface.
         """
+        # Check if n_requests is 0, in which case we always take action 0
+        if state["n_requests"][0] == 0:
+            return 0
+        
         state_array = np.concatenate([
             state["control_stop_idx"],
             state["n_requests"], 
@@ -260,29 +265,18 @@ class MultiVehicleTrainer:
 
 
 def evaluate_agent(env, agent, num_episodes=10):
-    """Evaluate the trained agent."""
-    rewards = []
-    
-    """Run the training loop."""
+    """Evaluate the agent's performance in the environment."""
+    results = {'pax': [], 'vehicles': [], 'state': [], 'idle': []}
     for episode in range(num_episodes):
-        episode_rewards = {i: 0 for i in range(N_VEHICLES)}
-        episode_counts = {i: 0 for i in range(N_VEHICLES)}
-        
-        # Initialize state tracking for each vehicle
-        vehicle_observations = {}
-        vehicle_actions = {}  # Track previous actions
-        
         # Start the episode
         next_observation, info = env.reset()
         vehicle_idx = info['veh_idx']
 
         # update observation
         observation = next_observation
-        vehicle_observations[vehicle_idx] = observation
         
         # select action
-        action = agent.act(observation, vehicle_idx)
-        vehicle_actions[vehicle_idx] = action
+        action = agent.act(observation, eval_mode=True)
 
         # take action in environment
         next_observation, reward, terminated, truncated, info = env.step(action)
@@ -292,51 +286,24 @@ def evaluate_agent(env, agent, num_episodes=10):
             # Get current vehicle index
             vehicle_idx = info['veh_idx']
             
-            # Check if this is a new vehicle
-            is_first_appearance = vehicle_idx not in vehicle_observations
-
-            if not is_first_appearance:
-                episode_rewards[vehicle_idx] += reward
-                episode_counts[vehicle_idx] += 1
-            
             # update observation
             observation = next_observation
-            vehicle_observations[vehicle_idx] = observation
 
             # Select action using shared policy
-            action = agent.act(observation, vehicle_idx)
-            vehicle_actions[vehicle_idx] = action
+            action = agent.act(observation, eval_mode=True)
             
             # Take action in environment
             next_observation, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
-        episode_reward = sum(episode_rewards.values()) / sum(episode_counts.values())
-        rewards.append(episode_reward)
-        print(f"Evaluation Episode {episode+1}: Reward = {episode_reward:.2f}")
-    return rewards
-
-
-# Example usage
-def train_vehicles():
-    env = FlexSimEnv()
-    state_size = 4  # control_stop_idx, n_requests, headway, schedule_deviation
-    action_size = 2  # binary action
-    
-    agent = SharedDQNAgent(state_size=state_size, action_size=action_size)
-    trainer = MultiVehicleTrainer(env, agent, num_episodes=400)
-    
-    print("Training with shared policy...")
-    scores = trainer.train()
-    
-    print("\nEvaluating trained agent...")
-    eval_rewards = evaluate_agent(env, agent)
-    
-    print(f"\nTraining complete! Final average reward: {np.mean(scores[-100:]):.2f}")
-
-    # save
-    torch.save(agent.qnetwork.state_dict(), 'shared_dqn_agent.pth')
-    print("Model saved as 'shared_dqn_agent.pth'")
-    return agent, scores
+        # recordings
+        history = env.get_history()
+        for key in history:
+            history[key]['scenario'] = 'RL'
+            history[key]['episode'] = episode
+            results[key].append(history[key])
+    for df_key in results:
+        results[df_key] = pd.concat(results[df_key])
+    return results
 
 def train_vehicles(reward_weights=REWARD_WEIGHTS):
     env = FlexSimEnv(reward_weights=reward_weights)
@@ -348,9 +315,6 @@ def train_vehicles(reward_weights=REWARD_WEIGHTS):
     
     print("Training with shared policy...")
     scores = trainer.train()
-    
-    print("\nEvaluating trained agent...")
-    eval_rewards = evaluate_agent(env, agent)
     
     print(f"\nTraining complete! Final average reward: {np.mean(scores[-100:]):.2f}")
 
@@ -370,6 +334,6 @@ def load_agent(model_path):
     
     # Set to evaluation mode (disables dropout, etc.)
     agent.qnetwork.eval()
-    
+
     return agent
 

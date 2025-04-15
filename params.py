@@ -70,7 +70,7 @@ ON_TIME_BOUNDS = (-60, 60) ## seconds
 # Define the bounds for each state variable in the environment
 
 REWARD_WEIGHTS = {
-    'lost_requests': -1.0,
+    'skipped_requests': -1.0,
     'off_schedule_trips': -1.0
 }
 

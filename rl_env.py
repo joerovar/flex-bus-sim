@@ -9,9 +9,9 @@ class FlexSimEnv(gym.Env):
     def __init__(self, reward_weights=REWARD_WEIGHTS):
         self.observation_space = spaces.Dict({
             "control_stop_idx": spaces.Discrete(4),  # there are four control stops in the route
-            "n_requests": spaces.Discrete(8),  # Clip any values above 7
-            "headway": spaces.Box(0.0, 1200.0, (1,), dtype=np.float32),  # headway (continuous)
-            "schedule_deviation": spaces.Box(-600.0, 600.0, (1,), dtype=np.float32),  # delay (continuous)
+            "n_requests": spaces.Discrete(5),  # Clip any values above 4
+            "headway": spaces.Box(0.0, 1400.0, (1,), dtype=np.float32),  # headway (continuous)
+            "schedule_deviation": spaces.Box(-1200.0, 1200.0, (1,), dtype=np.float32),  # delay (continuous)
         })
 
         ## Action space remains discrete (binary actions: deviate or not)
@@ -26,7 +26,7 @@ class FlexSimEnv(gym.Env):
 
     def get_obs_dict(self, observation):
         control_stop_index = observation[0]
-        n_requests = np.int32(min(observation[1], np.int32(7)))
+        n_requests = np.int32(min(observation[1], np.int32(4)))
         headway = observation[2]
         schedule_deviation = observation[3]
         

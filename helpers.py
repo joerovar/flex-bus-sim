@@ -134,10 +134,10 @@ def get_observation(vehicle: object, route: object, control_stops: list):
 
     ## check conditions
     is_departing = vehicle.event['next']['type'] == 'depart'
-    flex_pax_waiting = len(flex_stop.active_pax) > 0
+    # flex_pax_waiting = len(flex_stop.active_pax) > 0
     not_first_arrival = len(control_stop.last_arrival_time) > 1
 
-    if is_departing and flex_pax_waiting and not_first_arrival:
+    if is_departing and not_first_arrival:
         observation = [
             np.int32(control_stop_index), 
             np.int32(n_requests),
@@ -224,18 +224,18 @@ def get_action(policy, observation=None, minimum_requests_slope=0, base_minimum_
     elif policy == 'DRD':
         schedule_deviation = observation[3] / 60 # convert to minutes
         n_requests = observation[1]
-        min_pax = schedule_deviation*minimum_requests_slope + base_minimum_requests
+        min_pax = max(schedule_deviation*minimum_requests_slope + base_minimum_requests, 0)
         if n_requests >= min_pax:
             return 1
         else:
             return 0
 
 def get_reward(inter_event_counts: dict, reward_weights: dict):
-    lost_requests = inter_event_counts['lost_requests']    
+    skipped_requests = inter_event_counts['skipped_requests']    
     off_schedule_trips = inter_event_counts['off_schedule_trips']
 
-    unweighted_rewards = [lost_requests, off_schedule_trips]
-    weighted_rewards = [reward_weights['lost_requests'] * lost_requests, reward_weights['off_schedule_trips'] * off_schedule_trips]
+    unweighted_rewards = [skipped_requests, off_schedule_trips]
+    weighted_rewards = [reward_weights['skipped_requests'] * skipped_requests, reward_weights['off_schedule_trips'] * off_schedule_trips]
     reward = np.float32(sum(weighted_rewards))
     return reward, unweighted_rewards
 

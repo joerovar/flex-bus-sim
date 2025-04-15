@@ -73,7 +73,7 @@ class RouteManager:
         self.archived_pax = []
         self.schedule = Schedule()
         self.lost_requests = []
-        self.inter_event = [{'lost_requests': 0, 'off_schedule_trips': 0} for _ in range(N_VEHICLES)]
+        self.inter_event = [{'skipped_requests': 0, 'off_schedule_trips': 0} for _ in range(N_VEHICLES)]
 
     def load_all_pax(self):
         for direction in self.stops:
@@ -100,8 +100,6 @@ class RouteManager:
                 if i in FLEX_STOPS and REMOVE_LONG_WAIT_FLEX:
                     lost_requests = self.stops[direction][i].remove_long_wait_pax(time_now)
                     self.lost_requests += lost_requests
-                    for item in self.inter_event:
-                        item['lost_requests'] += len(lost_requests)
                 self.stops[direction][i].move_to_active_pax(time_now)
 
     def get_scheduled_time(self, stop_idx, trip_idx, direction):
@@ -173,10 +171,9 @@ class Vehicle:
         self.direction = next_direction
 
         ## update the on-time arrivals counter
-        delay = self.event['next']['time'] - next_schd_time
-        if delay > ON_TIME_BOUNDS[1] or delay < ON_TIME_BOUNDS[0]:
-            for item in route.inter_event:
-                item['off_schedule_trips'] += 1
+        schedule_deviation = self.event['next']['time'] - next_schd_time
+        if schedule_deviation > ON_TIME_BOUNDS[1] or schedule_deviation < ON_TIME_BOUNDS[0]:
+            route.inter_event[self.idx]['off_schedule_trips'] += 1
         
         ## update idle time tracker
         idle_time = max(0, next_schd_time - finish_time)
@@ -286,9 +283,13 @@ class EnvironmentManager:
         
     def step(self, action=None):
         if action is not None:
-            ## update
+            # record in inter_event_count
+            if action == 0:
+                n_requests = self.state_hist[self.veh_idx]['observation'][-1][1]
+                self.route.inter_event[self.veh_idx]['skipped_requests'] += n_requests
+            # update
             self.state_hist[self.veh_idx]['action'].append(action)
-            ## perform event
+            # perform event
             self.route.vehicles[self.veh_idx].depart_stop(self.route, deviate=action)
         
         self.veh_idx = find_next_event_vehicle_index(self.route.vehicles, self.timestamps[-1])
