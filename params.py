@@ -64,15 +64,16 @@ REMOVE_LONG_WAIT_FLEX = True
 
 ## time until a trip is considered late
 SCHEDULE_TOLERANCE = 3 ## minutes
-ON_TIME_BOUNDS = (-60, 60) ## seconds
+ON_TIME_BOUNDS = (-120, 60) ## seconds
 
 ## State definition
 # Define the bounds for each state variable in the environment
 
-REWARD_WEIGHTS = {
+ALL_REWARD_WEIGHTS = {
     'skipped_requests': -1.0,
     'off_schedule_trips': -1.0
 }
+TRIP_WEIGHT = -4.0 # weight for the trip reward
 
 ## SELECTIVE DEVIATION PARAMETERS
 DELAY_THRESHOLD = 60
@@ -83,3 +84,6 @@ SLOPE_MINIMUM_REQUESTS = 1.0
 
 ## PATHS FOR OUTPUT
 OUTPUT_FOLDER_PATH = 'outputs/'
+
+# FOR RL Training
+STEPS_PER_EPISODE = 65 # based on testing

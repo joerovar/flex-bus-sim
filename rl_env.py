@@ -6,7 +6,7 @@ from objects import EnvironmentManager
 
 class FlexSimEnv(gym.Env):
     """Custom Environment that follows gym interface."""
-    def __init__(self, reward_weights=REWARD_WEIGHTS):
+    def __init__(self, reward_weight=TRIP_WEIGHT):
         self.observation_space = spaces.Dict({
             "control_stop_idx": spaces.Discrete(4),  # there are four control stops in the route
             "n_requests": spaces.Discrete(5),  # Clip any values above 4
@@ -22,7 +22,7 @@ class FlexSimEnv(gym.Env):
         self.route = None
 
         # Initialize reward weights
-        self.reward_weights = reward_weights
+        self.reward_weight = reward_weight
 
     def get_obs_dict(self, observation):
         control_stop_index = observation[0]
@@ -45,7 +45,7 @@ class FlexSimEnv(gym.Env):
         return obs_dict, reward, terminated, truncated, info
 
     def reset(self, seed=None, options=None):
-        self.env = EnvironmentManager(reward_weights=self.reward_weights)
+        self.env = EnvironmentManager(reward_weight=self.reward_weight)
         self.env.start_vehicles()
         self.env.route.load_all_pax()
         observation, _, _, _, info = self.env.step(action=None)

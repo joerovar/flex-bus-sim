@@ -5,8 +5,9 @@ import torch.nn as nn
 import torch.optim as optim
 from collections import deque, namedtuple
 import random
-from params import N_VEHICLES, REWARD_WEIGHTS
+from params import N_VEHICLES, TRIP_WEIGHT, STEPS_PER_EPISODE
 from rl_env import FlexSimEnv  # Assuming FlexSimEnv is defined in rl_env.py
+from itertools import product
 
 # Define the experience tuple structure - include vehicle index for monitoring
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done', 'veh_idx'])
@@ -70,9 +71,9 @@ class QNetwork(nn.Module):
 class SharedDQNAgent:
     """DQN Agent with a single policy shared across all vehicles."""
     def __init__(self, state_size=4, action_size=2, hidden_size=64, 
-                 learning_rate=5e-4, gamma=0.99, epsilon_start=1.0,
-                 epsilon_min=0.05, buffer_size=10000,
-                 batch_size=64, update_every=4, epsilon_decay_rate=0.9995):
+                 learning_rate=5e-3, gamma=0.99, buffer_size=1000,
+                 batch_size=64, update_every=12, n_steps=1_000, 
+                 training_portion=0.7): # TODO: make sure that you are calling it what it should be
         
         # Initialize a single shared Q-Network for all vehicles
         self.qnetwork = QNetwork(state_size, action_size, hidden_size)
@@ -88,27 +89,29 @@ class SharedDQNAgent:
         self.action_size = action_size
         self.batch_size = batch_size
         self.gamma = gamma
+
+        epsilon_start = 1.0
+        epsilon_min = 0.05
         self.epsilon = epsilon_start
         self.epsilon_min = epsilon_min
-        self.epsilon_decay = epsilon_decay_rate
+
+        # linear decay
+        n_exploration_steps = int(n_steps*training_portion)
+        epsilon_decay_step = (self.epsilon-epsilon_min)/n_exploration_steps
+        self.epsilon_decay = epsilon_decay_step
+
         self.update_every = update_every
         self.t_step = 0
-
-        # compute linear epsilon decay for 70% of the training
-
-        # For tracking vehicle performance
-        self.vehicle_rewards = {i: [] for i in range(N_VEHICLES)}
+        self.total_steps = 0
         
     def step(self, state, action, reward, next_state, done, veh_idx):
         """Process a step from the environment."""
         # Add experience to shared memory
         self.memory.add(state, action, reward, next_state, done, veh_idx)
         
-        # Track rewards per vehicle
-        self.vehicle_rewards[veh_idx].append(reward)
-        
         # Learn every update_every time steps
         self.t_step = (self.t_step + 1) % self.update_every
+        self.total_steps += 1
         if self.t_step == 0 and len(self.memory) > self.batch_size:
             self.learn()
     
@@ -171,38 +174,29 @@ class SharedDQNAgent:
         self._soft_update(self.qnetwork, self.target_network)
         
         # Decay epsilon
-        self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
+        self.epsilon = max(self.epsilon_min, self.epsilon - self.epsilon_decay)
     
     def _soft_update(self, local_model, target_model, tau=1e-3):
         """Soft update target network parameters."""
         for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
             target_param.data.copy_(tau * local_param.data + (1.0 - tau) * target_param.data)
-    
-    def get_vehicle_stats(self):
-        """Return performance statistics for each vehicle."""
-        stats = {}
-        for veh_idx, rewards in self.vehicle_rewards.items():
-            if rewards:
-                stats[veh_idx] = {
-                    "mean_reward": np.mean(rewards),
-                    "min_reward": np.min(rewards),
-                    "max_reward": np.max(rewards),
-                    "count": len(rewards)
-                }
-        return stats
 
 
 class MultiVehicleTrainer:
     """Trainer that handles multiple vehicles in the environment with a shared policy."""
-    def __init__(self, env, agent, num_episodes=1000):
+    def __init__(self, env, agent, num_episodes=200, n_steps=10_000, verbose=False):
         self.env = env
         self.agent = agent
         self.num_episodes = num_episodes
+        self.max_n_steps = n_steps
         self.scores = []
+        self.verbose = verbose
         
     def train(self):
         """Run the training loop."""
         for episode in range(self.num_episodes):
+            if self.agent.total_steps > self.max_n_steps:
+                return self.scores
             episode_rewards = {i: 0 for i in range(N_VEHICLES)}
             episode_counts = {i: 0 for i in range(N_VEHICLES)}
             
@@ -258,19 +252,29 @@ class MultiVehicleTrainer:
             self.scores.append(episode_score)
             
             # Print progress
-            if episode % 20 == 0:
-                print(f"Episode {episode}/{self.num_episodes}, Avg Score: {np.mean(self.scores[-20:]):.2f}, Epsilon: {self.agent.epsilon:.4f}")
-        
+            if episode % 40 == 0 and self.verbose:
+                print("------")
+                print(f"Episode {episode}/{self.num_episodes}, Avg Score: {np.mean(self.scores[-40:]):.2f}, Epsilon: {self.agent.epsilon:.4f}, Number of steps: {self.agent.total_steps}")
+                print("------")
         return self.scores
 
-
-def evaluate_agent(env, agent, num_episodes=10):
+def evaluate_agent(env, agent, num_episodes=10, output_history=False,
+                   scenario_name=None):
     """Evaluate the agent's performance in the environment."""
-    results = {'pax': [], 'vehicles': [], 'state': [], 'idle': []}
+    history = {'pax': [], 'vehicles': [], 'state': [], 'idle': []}
+    rewards_per_episode = []
+    results_per_episode = {
+        'deviation_opportunities': [],
+        'deviations': [],
+        'avg_picked_requests': [],
+        'early_trips': [],
+        'late_trips': []
+    }
+    history = {'pax': [], 'vehicles': [], 'state': [], 'idle': []}
+
     for episode in range(num_episodes):
         # Start the episode
         next_observation, info = env.reset()
-        vehicle_idx = info['veh_idx']
 
         # update observation
         observation = next_observation
@@ -280,12 +284,10 @@ def evaluate_agent(env, agent, num_episodes=10):
 
         # take action in environment
         next_observation, reward, terminated, truncated, info = env.step(action)
+        rewards_per_episode.append(reward)
         done = terminated or truncated
 
         while not done:
-            # Get current vehicle index
-            vehicle_idx = info['veh_idx']
-            
             # update observation
             observation = next_observation
 
@@ -294,33 +296,68 @@ def evaluate_agent(env, agent, num_episodes=10):
             
             # Take action in environment
             next_observation, reward, terminated, truncated, info = env.step(action)
+            rewards_per_episode.append(reward)
             done = terminated or truncated
+        
         # recordings
-        history = env.get_history()
-        for key in history:
-            history[key]['scenario'] = 'RL'
-            history[key]['episode'] = episode
-            results[key].append(history[key])
-    for df_key in results:
-        results[df_key] = pd.concat(results[df_key])
-    return results
+        if output_history:
+            episode_history = env.env.get_history()
+            for key in episode_history:
+                episode_history[key]['episode'] = episode
+                if scenario_name:
+                    episode_history[key]['scenario'] = scenario_name
+                history[key].append(episode_history[key])
 
-def train_vehicles(reward_weights=REWARD_WEIGHTS):
-    env = FlexSimEnv(reward_weights=reward_weights)
+        # update results
+        deviation_opps, deviations, avg_picked_requests, early_trips, late_trips = env.env.get_tracker_info()
+        results_per_episode['deviation_opportunities'].append(deviation_opps)
+        results_per_episode['deviations'].append(deviations)
+        results_per_episode['avg_picked_requests'].append(avg_picked_requests)
+        results_per_episode['early_trips'].append(early_trips)
+        results_per_episode['late_trips'].append(late_trips)
+
+    summary_results = {
+        'mean_reward': round(np.nanmean(rewards_per_episode),3),
+        'std_reward': round(np.nanstd(rewards_per_episode),3),
+        'deviation_opportunities': round(np.mean(results_per_episode['deviation_opportunities']),1),
+        'deviations': round(np.mean(results_per_episode['deviations']),1),
+        'avg_picked_requests': round(np.mean(results_per_episode['avg_picked_requests']),1),
+        'early_trips': round(np.mean(results_per_episode['early_trips']),1),
+        'late_trips': round(np.mean(results_per_episode['late_trips']),1)
+    }
+    if output_history:
+        for df_key in history:
+            history[df_key] = pd.concat(history[df_key])
+        return history, summary_results
+    else:
+        return summary_results
+
+def train_vehicles(reward_weight=TRIP_WEIGHT,
+                   learning_rate=5e-4, 
+                   gamma=0.99, buffer_size=1000,
+                   batch_size=64, update_every=12, 
+                   n_steps=1_000, save_path=None):
+    env = FlexSimEnv(reward_weight=reward_weight)
     state_size = 4  # control_stop_idx, n_requests, headway, schedule_deviation
     action_size = 2  # binary action
+    num_episodes = int(n_steps/STEPS_PER_EPISODE) + 5 # extra episodes as buffer
     
-    agent = SharedDQNAgent(state_size=state_size, action_size=action_size)
-    trainer = MultiVehicleTrainer(env, agent, num_episodes=500)
+    agent = SharedDQNAgent(state_size=state_size, action_size=action_size,
+                           learning_rate=learning_rate, 
+                           gamma=gamma, buffer_size=buffer_size,
+                           batch_size=batch_size, 
+                           update_every=update_every, n_steps=n_steps)
+    trainer = MultiVehicleTrainer(env, agent, num_episodes=num_episodes)
     
     print("Training with shared policy...")
     scores = trainer.train()
     
-    print(f"\nTraining complete! Final average reward: {np.mean(scores[-100:]):.2f}")
+    print(f"\nTraining complete! Final average reward: {np.mean(scores[-40:]):.2f}\n")
 
     # save
-    torch.save(agent.qnetwork.state_dict(), 'shared_dqn_agent.pth')
-    print("Model saved as 'shared_dqn_agent.pth'")
+    if save_path:
+        torch.save(agent.qnetwork.state_dict(), save_path)
+        print(f"Model saved as {save_path}")
     return agent, scores
 
 def load_agent(model_path):
@@ -334,6 +371,55 @@ def load_agent(model_path):
     
     # Set to evaluation mode (disables dropout, etc.)
     agent.qnetwork.eval()
-
     return agent
+
+def grid_search_dqn(
+    lr_values=[5e-3, 6e-3], # learning rate
+    n_steps_values=[12_000, 24_000], # timesteps
+    gamma_values=[0.98, 0.99], # discount factor
+    reward_weights=[TRIP_WEIGHT],
+    verbose=False
+):  
+    # Dictionary to store results
+    grid_search_results = {
+        'weight': [],
+        'lr': [],
+        'n_steps': [],
+        'gamma': [],
+        'mean_reward': [],
+        'std_reward': [],
+        'deviation_opportunities': [],
+        'deviations': [],
+        'avg_picked_requests': [    ],
+        'early_trips': [],
+        'late_trips': []
+    }
+    
+    # Grid search
+    for lr, n_steps, gamma, weight in product(lr_values, n_steps_values, gamma_values, reward_weights):
+        # Train model with current parameters
+        np.random.seed(0)
+
+        agent, scores = train_vehicles(learning_rate=lr, n_steps=n_steps, gamma=gamma, reward_weight=weight)
+        
+        # Evaluate model
+        env = FlexSimEnv(reward_weight=weight)
+        summary_results = evaluate_agent(env, agent, num_episodes=30)
+        
+        ## Store in results
+        grid_search_results['weight'].append(weight)
+        grid_search_results['lr'].append(lr)
+        grid_search_results['n_steps'].append(n_steps)       
+        grid_search_results['gamma'].append(gamma)
+
+        for key in summary_results:
+            grid_search_results[key].append(summary_results[key])
+
+        if verbose:
+            print(f"Evaluation summary:")
+            print(f"Params: lr={lr}, n_steps={n_steps}, gamma={gamma}, reward_weight={weight}")
+            print(f"Reward: {round(summary_results['mean_reward'], 3)} +/- {round(summary_results['std_reward'], 3)}")
+            print("------------------------")    
+    return grid_search_results
+
 

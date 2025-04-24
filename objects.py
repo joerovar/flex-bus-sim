@@ -137,6 +137,13 @@ class Vehicle:
                            'departure_time': [], 'load': [],
                            'boardings': [], 'alightings': [], 'scheduled_time': []}
         self.trip_idx = None
+        self.tracker = {
+            'deviation_opportunities': 0,
+            'deviations': 0,
+            'requests_picked': [],
+            'early_trips': 0,
+            'late_trips': 0,
+        }
     
     def start(self, route):
         self.direction = 'out'
@@ -170,10 +177,6 @@ class Vehicle:
         self.event['next']['stop'] = 0
         self.direction = next_direction
 
-        ## update the on-time arrivals counter
-        schedule_deviation = self.event['next']['time'] - next_schd_time
-        if schedule_deviation > ON_TIME_BOUNDS[1] or schedule_deviation < ON_TIME_BOUNDS[0]:
-            route.inter_event[self.idx]['off_schedule_trips'] += 1
         
         ## update idle time tracker
         idle_time = max(0, next_schd_time - finish_time)
@@ -189,11 +192,24 @@ class Vehicle:
         self.event_hist['direction'].append(self.direction)
         self.event_hist['stop'].append(self.event['next']['stop'])
         self.event_hist['arrival_time'].append(time_now)
-        self.event_hist['scheduled_time'].append(route.get_scheduled_time(self.event['next']['stop'], self.trip_idx, self.direction))
+        scheduled_time = route.get_scheduled_time(self.event['next']['stop'], self.trip_idx, self.direction)
+        self.event_hist['scheduled_time'].append(scheduled_time)
         
         ## process
         is_flex = self.event['next']['stop'] in FLEX_STOPS
         dwell_time = pax_activity(self, route, STATIC_DWELL, DYNAMIC_DWELL, time_now, is_flex=is_flex)
+
+        ## update the on-time arrivals tracker if it is a control stop or the terminal
+        if self.event['next']['stop'] in CONTROL_STOPS + [N_STOPS-1]:
+            schedule_deviation = time_now - scheduled_time
+            early = schedule_deviation < ON_TIME_BOUNDS[0]
+            late = schedule_deviation > ON_TIME_BOUNDS[1]
+            if early:
+                self.tracker['early_trips'] += 1
+            elif late:
+                self.tracker['late_trips'] += 1
+            if early or late:
+                route.inter_event[self.idx]['off_schedule_trips'] += 1
 
         self.event['last']['time'] = self.event['next']['time']
         self.event['last']['type'] = 'arrive'
@@ -245,7 +261,7 @@ class Vehicle:
 
 
 class EnvironmentManager:
-    def __init__(self, reward_weights=REWARD_WEIGHTS) -> None:
+    def __init__(self, reward_weight=TRIP_WEIGHT) -> None:
         start_time = 0
         self.timestamps = [start_time]
 
@@ -255,7 +271,7 @@ class EnvironmentManager:
         self.state_hist = [{'time': [], 'observation': [], 'action': [], 
                            'reward': [], 'unweighted_rewards': []} for i in range(N_VEHICLES)]
         self.route = RouteManager()
-        self.reward_weights = reward_weights
+        self.reward_weight = reward_weight
     
     def start_vehicles(self):
         for vehicle in self.route.vehicles:
@@ -280,13 +296,35 @@ class EnvironmentManager:
         
         history['idle'] = pd.DataFrame(self.route.idle_time)
         return history
+    
+    def get_tracker_info(self):
+        # get deviation opportunities and deviations
+        deviation_opp = 0
+        deviations = 0
+        requests_picked = []
+        early_trips = 0
+        late_trips = 0
+        for vehicle in self.route.vehicles:
+            deviation_opp += vehicle.tracker['deviation_opportunities']
+            deviations += vehicle.tracker['deviations']
+            requests_picked += vehicle.tracker['requests_picked']
+            early_trips += vehicle.tracker['early_trips']
+            late_trips += vehicle.tracker['late_trips']
+        # get average of requests picked
+        avg_requests_picked = np.mean(requests_picked) if len(requests_picked) > 0 else 0
+        return deviation_opp, deviations, avg_requests_picked, early_trips, late_trips
         
     def step(self, action=None):
         if action is not None:
             # record in inter_event_count
+            n_requests = self.state_hist[self.veh_idx]['observation'][-1][1]
+            if n_requests > 0:
+                self.route.vehicles[self.veh_idx].tracker['deviation_opportunities'] += 1
             if action == 0:
-                n_requests = self.state_hist[self.veh_idx]['observation'][-1][1]
-                self.route.inter_event[self.veh_idx]['skipped_requests'] += n_requests
+                self.route.inter_event[self.veh_idx]['skipped_requests'] += n_requests            
+            else:
+                self.route.vehicles[self.veh_idx].tracker['deviations'] += 1
+                self.route.vehicles[self.veh_idx].tracker['requests_picked'].append(n_requests)
             # update
             self.state_hist[self.veh_idx]['action'].append(action)
             # perform event
@@ -312,8 +350,6 @@ class EnvironmentManager:
             diff_headway = headway - headway_threshold
             if diff_headway < 0:
                 # advance the clock
-                # print(f"held by {diff_headway} seconds")
-                # print(f"because the headway is: {headway}")
                 self.route.vehicles[self.veh_idx].event['next']['time'] += abs(diff_headway)
                 
                 # check if time has exceeded
@@ -329,7 +365,7 @@ class EnvironmentManager:
             # get reward
             if self.state_hist[self.veh_idx]['observation']:
                 inter_event_counts = self.route.inter_event[self.veh_idx]
-                reward, unweighted_rewards = get_reward(inter_event_counts, self.reward_weights)
+                reward, unweighted_rewards = get_reward(inter_event_counts, self.reward_weight)
                 self.state_hist[self.veh_idx]['reward'].append(reward)
                 self.state_hist[self.veh_idx]['unweighted_rewards'].append(unweighted_rewards)
             else:

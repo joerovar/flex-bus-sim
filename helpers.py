@@ -225,17 +225,17 @@ def get_action(policy, observation=None, minimum_requests_slope=0, base_minimum_
         schedule_deviation = observation[3] / 60 # convert to minutes
         n_requests = observation[1]
         min_pax = max(schedule_deviation*minimum_requests_slope + base_minimum_requests, 0)
-        if n_requests >= min_pax:
+        if n_requests > min_pax:
             return 1
         else:
             return 0
 
-def get_reward(inter_event_counts: dict, reward_weights: dict):
+def get_reward(inter_event_counts: dict, reward_weight: float):
     skipped_requests = inter_event_counts['skipped_requests']    
     off_schedule_trips = inter_event_counts['off_schedule_trips']
 
     unweighted_rewards = [skipped_requests, off_schedule_trips]
-    weighted_rewards = [reward_weights['skipped_requests'] * skipped_requests, reward_weights['off_schedule_trips'] * off_schedule_trips]
+    weighted_rewards = [-1.0 * skipped_requests, reward_weight * off_schedule_trips]
     reward = np.float32(sum(weighted_rewards))
     return reward, unweighted_rewards
 
