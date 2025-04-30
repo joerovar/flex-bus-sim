@@ -2,11 +2,11 @@ PATH_ROUTES = 'data/routes.csv'
 PATH_STOPS = 'data/stops.csv'
 
 ## simulation parameters
-MAX_TIME_HOURS = 4.0 # hours
+MAX_TIME_HOURS = 5.0 # hours
 BUFFER_SECONDS = 3600 # seconds
 N_VEHICLES = 2
-RESULTS_START_TIME_MINUTES = 30
-RESULTS_END_TIME_MINUTES = 180
+# RESULTS_START_TIME_MINUTES = 30
+# RESULTS_END_TIME_MINUTES = 180
 
 ## route layout
 N_STOPS = 7 # per direction
@@ -17,7 +17,7 @@ CONTROL_STOPS = [i-1 for i in FLEX_STOPS]
 STATIC_DWELL = 6 # seconds
 DYNAMIC_DWELL = 2 # seconds
 SEGMENT_TIMES = {
-    'flex': {'mean': 80, 'std': 20},
+    'flex': {'mean': 85, 'std': 20},
     'fixed': {'mean': 110, 'std': 30}
 }
 
@@ -35,8 +35,8 @@ SCHEDULED_STOP_TIMES = [
     600]
 
 ## demand parameters
-OD_LOW = 3.5
-OD_HIGH = 6.5
+OD_LOW = 4.0
+OD_HIGH = 7.5
 
 OD_MATRIX = [
     [0, OD_LOW, 0, OD_HIGH, 0, OD_HIGH, 0],
@@ -64,7 +64,7 @@ REMOVE_LONG_WAIT_FLEX = True
 
 ## time until a trip is considered late
 SCHEDULE_TOLERANCE = 3 ## minutes
-ON_TIME_BOUNDS = (-120, 60) ## seconds
+ON_TIME_BOUNDS = (-90, 60) ## seconds
 
 ## State definition
 # Define the bounds for each state variable in the environment

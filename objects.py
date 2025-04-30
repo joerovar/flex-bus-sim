@@ -200,7 +200,7 @@ class Vehicle:
         dwell_time = pax_activity(self, route, STATIC_DWELL, DYNAMIC_DWELL, time_now, is_flex=is_flex)
 
         ## update the on-time arrivals tracker if it is a control stop or the terminal
-        if self.event['next']['stop'] in CONTROL_STOPS + [N_STOPS-1]:
+        if self.event['next']['stop'] in [CONTROL_STOPS[1], N_STOPS-1]:
             schedule_deviation = time_now - scheduled_time
             early = schedule_deviation < ON_TIME_BOUNDS[0]
             late = schedule_deviation > ON_TIME_BOUNDS[1]
@@ -209,6 +209,8 @@ class Vehicle:
             elif late:
                 self.tracker['late_trips'] += 1
             if early or late:
+                # print(f"Vehicle {self.idx}")
+                # print(f"Scheduled time: {scheduled_time}, Arrival time: {time_now}, Deviation: {schedule_deviation}")
                 route.inter_event[self.idx]['off_schedule_trips'] += 1
 
         self.event['last']['time'] = self.event['next']['time']

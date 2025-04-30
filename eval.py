@@ -34,7 +34,7 @@ def evaluate_heuristic(slope, n_episodes=30, output_history=False, reward_weight
         observation, reward, terminated, truncated, info = env.step(action=None)
         rewards_per_episode.append(reward)
         while not terminated:
-            action = get_action('DRD', observation, slope)
+            action = get_action('DRD', observation, minimum_requests_slope=1.0, base_minimum_requests=slope)
             observation, reward, terminated, truncated, info = env.step(action=action)
             rewards_per_episode.append(reward)
 
