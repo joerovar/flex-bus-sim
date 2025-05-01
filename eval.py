@@ -15,7 +15,7 @@ def float_to_string(num):
 
 def evaluate_heuristic(slope, n_episodes=30, output_history=False, reward_weight=TRIP_WEIGHT,
                        scenario_name=None):
-    history = {'pax': [], 'vehicles': [], 'state': [], 'idle': []}
+    history = {'pax': [], 'vehicles': [], 'idle': []}
     rewards_per_episode = []
     results_per_episode = {
         'deviation_opportunities': [],
@@ -31,12 +31,15 @@ def evaluate_heuristic(slope, n_episodes=30, output_history=False, reward_weight
         env.start_vehicles()
         env.route.load_all_pax()
 
-        observation, reward, terminated, truncated, info = env.step(action=None)
-        rewards_per_episode.append(reward)
+        observation, reward, done, terminated, info = env.step(action=None)
         while not terminated:
-            action = get_action('DRD', observation, minimum_requests_slope=1.0, base_minimum_requests=slope)
-            observation, reward, terminated, truncated, info = env.step(action=action)
-            rewards_per_episode.append(reward)
+            if not done:
+                action = get_action(
+                    'DRD', observation, 
+                    minimum_requests_slope=1.0, base_minimum_requests=slope) # ideal slope
+            else:
+                action = None
+            observation, reward, done, terminated, info = env.step(action=action)
 
         # update results
         deviation_opps, deviations, avg_picked_requests, early_trips, late_trips = env.get_tracker_info()

@@ -217,10 +217,9 @@ class MultiVehicleTrainer:
             vehicle_actions[vehicle_idx] = action
 
             # take action in environment
-            next_observation, reward, terminated, truncated, info = self.env.step(action)
-            done = terminated or truncated
+            next_observation, reward, done, terminated, info = self.env.step(action)
 
-            while not done:
+            while not terminated:
                 # Get current vehicle index
                 vehicle_idx = info['veh_idx']
                 
@@ -230,22 +229,25 @@ class MultiVehicleTrainer:
                 if not is_first_appearance:
                     # add to the training buffer
                     observation = vehicle_observations[vehicle_idx]
-                    action = vehicle_actions[vehicle_idx]
-                    self.agent.step(observation, action, reward, next_observation, done, vehicle_idx)
-                    episode_rewards[vehicle_idx] += reward
-                    episode_counts[vehicle_idx] += 1
+                    if observation['control_stop_idx'] != 2:
+                        action = vehicle_actions[vehicle_idx]
+                        self.agent.step(observation, action, reward, next_observation, done, vehicle_idx)
+                        episode_rewards[vehicle_idx] += reward
+                        episode_counts[vehicle_idx] += 1
                 
                 # update observation
                 observation = next_observation
                 vehicle_observations[vehicle_idx] = observation
 
                 # Select action using shared policy
-                action = self.agent.act(observation, vehicle_idx)
-                vehicle_actions[vehicle_idx] = action
+                if not done:
+                    action = self.agent.act(observation, vehicle_idx)
+                    vehicle_actions[vehicle_idx] = action
+                else:
+                    action = None
                 
                 # Take action in environment
-                next_observation, reward, terminated, truncated, info = self.env.step(action)
-                done = terminated or truncated
+                next_observation, reward, done, terminated, info = self.env.step(action)
             
             # Track episode score (average across active vehicles)
             episode_score = sum(episode_rewards.values()) / sum(episode_counts.values())
@@ -261,7 +263,6 @@ class MultiVehicleTrainer:
 def evaluate_agent(env, agent, num_episodes=10, output_history=False,
                    scenario_name=None):
     """Evaluate the agent's performance in the environment."""
-    history = {'pax': [], 'vehicles': [], 'state': [], 'idle': []}
     rewards_per_episode = []
     results_per_episode = {
         'deviation_opportunities': [],
@@ -270,7 +271,7 @@ def evaluate_agent(env, agent, num_episodes=10, output_history=False,
         'early_trips': [],
         'late_trips': []
     }
-    history = {'pax': [], 'vehicles': [], 'state': [], 'idle': []}
+    history = {'pax': [], 'vehicles': [],  'idle': []}
 
     for episode in range(num_episodes):
         # Start the episode
@@ -283,21 +284,24 @@ def evaluate_agent(env, agent, num_episodes=10, output_history=False,
         action = agent.act(observation, eval_mode=True)
 
         # take action in environment
-        next_observation, reward, terminated, truncated, info = env.step(action)
+        next_observation, reward, done, terminated, info = env.step(action)
         rewards_per_episode.append(reward)
-        done = terminated or truncated
 
-        while not done:
-            # update observation
-            observation = next_observation
-
-            # Select action using shared policy
-            action = agent.act(observation, eval_mode=True)
-            
-            # Take action in environment
-            next_observation, reward, terminated, truncated, info = env.step(action)
+        while not terminated:
+            if not done:
+                action = agent.act(observation, eval_mode=True)
+            else:
+                action = None
+            observation, reward, done, terminated, info = env.step(action=action)
             rewards_per_episode.append(reward)
-            done = terminated or truncated
+            # # update observation
+            # observation = next_observation
+
+            # # Select action using shared policy
+            
+            # # Take action in environment
+            # next_observation, reward, terminated, truncated, info = env.step(action)
+            # done = terminated or truncated
         
         # recordings
         if output_history:
@@ -390,7 +394,7 @@ def grid_search_dqn(
         'std_reward': [],
         'deviation_opportunities': [],
         'deviations': [],
-        'avg_picked_requests': [    ],
+        'avg_picked_requests': [],
         'early_trips': [],
         'late_trips': []
     }
@@ -421,5 +425,4 @@ def grid_search_dqn(
             print(f"Reward: {round(summary_results['mean_reward'], 3)} +/- {round(summary_results['std_reward'], 3)}")
             print("------------------------")    
     return grid_search_results
-
 

@@ -124,13 +124,14 @@ def pax_activity(vehicle, route, static_dwell, dynamic_dwell, time_now, is_flex)
 def get_observation(vehicle: object, route: object, control_stops: list):
     ## get stop, direction, and next flex stop of vehicle
     direction, stop_idx = vehicle.get_location()
-    if stop_idx not in control_stops:
+    if stop_idx not in CONTROL_STOPS:
         return None
-    flex_stop_idx = stop_idx + 1
     control_stop = route.stops[direction][stop_idx]
-    control_stop_index = get_control_stop_index((direction, stop_idx))
-    flex_stop = route.stops[direction][flex_stop_idx]
-    n_requests = route.get_n_waiting_pax(flex_stop_idx, direction)
+    control_stop_index = STOP_TO_CONTROL_STOP_MAP
+    
+    if stop_idx != CONTROL_STOPS[-1]:
+        flex_stop_idx = stop_idx + 1
+        n_requests = route.get_n_waiting_pax(flex_stop_idx, direction)
 
     ## check conditions
     is_departing = vehicle.event['next']['type'] == 'depart'
@@ -230,14 +231,22 @@ def get_action(policy, observation=None, minimum_requests_slope=0, base_minimum_
         else:
             return 0
 
-def get_reward(inter_event_counts: dict, reward_weight: float):
-    skipped_requests = inter_event_counts['skipped_requests']    
-    off_schedule_trips = inter_event_counts['off_schedule_trips']
+# def get_reward(inter_event_counts: dict, reward_weight: float):
+#     skipped_requests = inter_event_counts['skipped_requests']    
+#     off_schedule_trips = inter_event_counts['off_schedule_trips']
 
-    unweighted_rewards = [skipped_requests, off_schedule_trips]
-    weighted_rewards = [-1.0 * skipped_requests, reward_weight * off_schedule_trips]
-    reward = np.float32(sum(weighted_rewards))
-    return reward, unweighted_rewards
+#     unweighted_rewards = [skipped_requests, off_schedule_trips]
+#     weighted_rewards = [-1.0 * skipped_requests, reward_weight * off_schedule_trips]
+#     reward = np.float32(sum(weighted_rewards))
+#     return reward, unweighted_rewards
 
-def get_control_stop_index(direction_stop: tuple):
-    return CONTROL_STOP_CONVERSION[direction_stop]
+
+# define a conversion from (direction,stop) to control stop index
+# CONTROL_STOP_CONVERSION = {
+#     ('out', 1): 0,
+#     ('out', 3): 1,
+#     ('in', 1): 2,
+#     ('in', 3): 3
+# }
+# def get_control_stop_index(direction_stop: tuple):
+#     return CONTROL_STOP_CONVERSION[direction_stop]

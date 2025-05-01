@@ -40,9 +40,9 @@ class FlexSimEnv(gym.Env):
         return obs_dict
 
     def step(self, action):
-        observation, reward, terminated, truncated, info = self.env.step(action)
+        observation, reward, done, terminated, info = self.env.step(action)
         obs_dict = self.get_obs_dict(observation)
-        return obs_dict, reward, terminated, truncated, info
+        return obs_dict, reward, done, terminated, info
 
     def reset(self, seed=None, options=None):
         self.env = EnvironmentManager(reward_weight=self.reward_weight)

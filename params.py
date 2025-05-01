@@ -11,13 +11,31 @@ N_VEHICLES = 2
 ## route layout
 N_STOPS = 7 # per direction
 FLEX_STOPS = [2, 4]
-CONTROL_STOPS = [i-1 for i in FLEX_STOPS]
+CONTROL_STOPS = [1, 3, 6]
+STOP_TO_CONTROL_STOP_MAP = {
+    1:0,
+    3:1,
+    6:2
+}
+
+CONTROL_STOPS_DIRECTION_MAPPING = {
+    0: 'out',
+    1: 'out',
+    2: 'in',
+    3: 'in'
+}
+CONTROL_STOPS_STOP_MAPPING = {
+    0: 1,
+    1: 3,
+    2: 1,
+    3: 3
+}
 
 ## travel/dwell times
 STATIC_DWELL = 6 # seconds
 DYNAMIC_DWELL = 2 # seconds
 SEGMENT_TIMES = {
-    'flex': {'mean': 85, 'std': 20},
+    'flex': {'mean': 82, 'std': 20},
     'fixed': {'mean': 110, 'std': 30}
 }
 
@@ -35,7 +53,7 @@ SCHEDULED_STOP_TIMES = [
     600]
 
 ## demand parameters
-OD_LOW = 4.0
+OD_LOW = 3.8
 OD_HIGH = 7.5
 
 OD_MATRIX = [
@@ -47,13 +65,7 @@ OD_MATRIX = [
     [0, 0, 0, 0, 0, 0, OD_LOW]
 ]
 
-# define a conversion from (direction,stop) to control stop index
-CONTROL_STOP_CONVERSION = {
-    ('out', 1): 0,
-    ('out', 3): 1,
-    ('in', 1): 2,
-    ('in', 3): 3
-}
+
 
 ## additional parameters
 

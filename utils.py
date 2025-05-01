@@ -3,11 +3,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
-
 # Change default DPI for all plots
 mpl.rcParams['figure.dpi'] = 150
-
-
 
 
 def plot_cumulative_idle_time(df, figsize=(4,3)):
@@ -36,6 +33,7 @@ def plot_cumulative_idle_time(df, figsize=(4,3)):
 
 
 def create_field_from_list_column(df, list_index, new_field_name, field_name='observation'):
+    df[field_name] = df[field_name].astype(str)
     df[new_field_name] = df[field_name].apply(lambda x: float(x.split(',')[list_index].strip('[]')))
 
 import numpy as np
