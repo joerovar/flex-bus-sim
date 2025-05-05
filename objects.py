@@ -76,13 +76,13 @@ class RouteManager:
         self.lost_requests = []
         self.inter_event = [{'skipped_requests': 0, 'off_schedule_trips': 0} for _ in range(N_VEHICLES)]
 
-    def load_all_pax(self):
+    def load_all_pax(self, demand_scenario='peak'):
         for direction in self.stops:
             set_stops = self.stops[direction]
             for i in range(len(set_stops)-1):
                 inter_arrival_times = []
                 for j in range(len(set_stops)):
-                    od_rate = OD_MATRIX[i][j]
+                    od_rate = OD_MATRIX[demand_scenario][i][j]
                     if od_rate > 0:
                         if direction == 'out':
                             arrival_times = list(get_poisson_arrival_times(od_rate, MAX_TIME_HOURS))

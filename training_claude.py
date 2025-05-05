@@ -340,8 +340,8 @@ def train_vehicles(reward_weight=TRIP_WEIGHT,
                    learning_rate=5e-4, 
                    gamma=0.99, buffer_size=1000,
                    batch_size=64, update_every=12, 
-                   n_steps=1_000, save_path=None):
-    env = FlexSimEnv(reward_weight=reward_weight)
+                   n_steps=1_000, save_path=None, demand_scenario='peak'):
+    env = FlexSimEnv(reward_weight=reward_weight, demand_scenario=demand_scenario)
     state_size = 4  # control_stop_idx, n_requests, headway, schedule_deviation
     action_size = 2  # binary action
     num_episodes = int(n_steps/STEPS_PER_EPISODE) + 5 # extra episodes as buffer
@@ -382,6 +382,7 @@ def grid_search_dqn(
     n_steps_values=[12_000, 24_000], # timesteps
     gamma_values=[0.98, 0.99], # discount factor
     reward_weights=[TRIP_WEIGHT],
+    demand_scenarios=['peak', 'off_peak'],
     verbose=False
 ):  
     # Dictionary to store results
@@ -390,6 +391,7 @@ def grid_search_dqn(
         'lr': [],
         'n_steps': [],
         'gamma': [],
+        'demand_scenario': [],
         'mean_reward': [],
         'std_reward': [],
         'deviation_opportunities': [],
@@ -400,11 +402,11 @@ def grid_search_dqn(
     }
     
     # Grid search
-    for lr, n_steps, gamma, weight in product(lr_values, n_steps_values, gamma_values, reward_weights):
+    for lr, n_steps, gamma, weight, demand in product(lr_values, n_steps_values, gamma_values, reward_weights, demand_scenarios):
         # Train model with current parameters
         np.random.seed(0)
 
-        agent, scores = train_vehicles(learning_rate=lr, n_steps=n_steps, gamma=gamma, reward_weight=weight)
+        agent, scores = train_vehicles(learning_rate=lr, n_steps=n_steps, gamma=gamma, reward_weight=weight, demand_scenario=demand)
         
         # Evaluate model
         env = FlexSimEnv(reward_weight=weight)
@@ -415,13 +417,14 @@ def grid_search_dqn(
         grid_search_results['lr'].append(lr)
         grid_search_results['n_steps'].append(n_steps)       
         grid_search_results['gamma'].append(gamma)
+        grid_search_results['demand_scenario'].append(demand)
 
         for key in summary_results:
             grid_search_results[key].append(summary_results[key])
 
         if verbose:
             print(f"Evaluation summary:")
-            print(f"Params: lr={lr}, n_steps={n_steps}, gamma={gamma}, reward_weight={weight}")
+            print(f"Params: lr={lr}, n_steps={n_steps}, gamma={gamma}, reward_weight={weight} demand_scenario={demand}")
             print(f"Reward: {round(summary_results['mean_reward'], 3)} +/- {round(summary_results['std_reward'], 3)}")
             print("------------------------")    
     return grid_search_results

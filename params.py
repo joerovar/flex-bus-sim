@@ -53,19 +53,26 @@ SCHEDULED_STOP_TIMES = [
     600]
 
 ## demand parameters
+def get_od_matrix(od_low, od_high):
+    return [
+        [0, od_low, 0, od_high, 0, od_high, 0],
+        [0, 0, 0, od_low, 0, od_low, od_high],
+        [0, 0, 0, 0, 0, od_low, od_low], ## FLEX
+        [0, 0, 0, 0, 0, od_low, od_high],
+        [0, 0, 0, 0, 0, 0, od_low], ## FLEX
+        [0, 0, 0, 0, 0, 0, od_low]
+    ]
+
+# peak scenario
 OD_LOW = 3.8
 OD_HIGH = 7.5
+OD_LOW_OFF_PEAK = 4.8
+OD_HIGH_OFF_PEAK = 5.5
 
-OD_MATRIX = [
-    [0, OD_LOW, 0, OD_HIGH, 0, OD_HIGH, 0],
-    [0, 0, 0, OD_LOW, 0, OD_LOW, OD_HIGH],
-    [0, 0, 0, 0, 0, OD_LOW, OD_LOW], ## FLEX
-    [0, 0, 0, 0, 0, OD_LOW, OD_HIGH],
-    [0, 0, 0, 0, 0, 0, OD_LOW], ## FLEX
-    [0, 0, 0, 0, 0, 0, OD_LOW]
-]
-
-
+OD_MATRIX = {
+    'peak': get_od_matrix(OD_LOW, OD_HIGH),
+    'off_peak': get_od_matrix(OD_LOW_OFF_PEAK, OD_HIGH_OFF_PEAK)
+}
 
 ## additional parameters
 
@@ -91,6 +98,9 @@ TRIP_WEIGHT = -4.0 # weight for the trip reward
 DELAY_THRESHOLD = 60
 
 # DYNAMIC SMART GREEDY PARAMETERS
+# REQUESTS_MIN = ALPHA + BETA * (SCHEDULE_DEVIATION)
+HEURISTIC_ALPHA = 1.0
+HEURISTIC_BETA = 1.0
 BASE_MINIMUM_REQUEST = 1
 SLOPE_MINIMUM_REQUESTS = 1.0
 

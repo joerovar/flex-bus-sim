@@ -1,5 +1,5 @@
 from objects import EnvironmentManager
-from helpers import *
+import pandas as pd
 import os
 from datetime import datetime
 from rl_env import *
@@ -13,7 +13,19 @@ def float_to_string(num):
     # Format as 2 digits with one decimal place, then remove the decimal point
     return f"{num:.1f}".replace(".", "")
 
-def evaluate_heuristic(slope, n_episodes=30, output_history=False, reward_weight=TRIP_WEIGHT,
+
+def get_heuristic_action(observation, alpha, beta):
+    schedule_deviation = observation[3] / 60 # convert to minutes
+    n_requests = observation[1]
+    min_pax = max(schedule_deviation*beta + alpha, 0)
+    if n_requests > min_pax:
+        return 1
+    else:
+        return 0
+
+def evaluate_heuristic(alpha=HEURISTIC_ALPHA, beta=HEURISTIC_BETA,
+                       demand_scenario='peak', 
+                       n_episodes=30, output_history=False,
                        scenario_name=None):
     history = {'pax': [], 'vehicles': [], 'idle': []}
     rewards_per_episode = []
@@ -27,16 +39,15 @@ def evaluate_heuristic(slope, n_episodes=30, output_history=False, reward_weight
 
     ## evaluation
     for i in range(n_episodes):
-        env = EnvironmentManager(reward_weight=reward_weight)
+        env = EnvironmentManager()
         env.start_vehicles()
-        env.route.load_all_pax()
+        env.route.load_all_pax(demand_scenario=demand_scenario)
 
         observation, reward, done, terminated, info = env.step(action=None)
         while not terminated:
             if not done:
-                action = get_action(
-                    'DRD', observation, 
-                    minimum_requests_slope=1.0, base_minimum_requests=slope) # ideal slope
+                action = get_heuristic_action(
+                    observation, alpha=alpha, beta=beta) # ideal slope
             else:
                 action = None
             observation, reward, done, terminated, info = env.step(action=action)
@@ -74,32 +85,32 @@ def evaluate_heuristic(slope, n_episodes=30, output_history=False, reward_weight
         return summary_results
 
 
-def evaluate_slopes(minimum_request_slopes=MINIMUM_REQUEST_SLOPES, 
-                    reward_weights=[TRIP_WEIGHT],):
-    slope_results = {
-        'slope': [],
-        'reward_weight': [],
-        'mean_reward': [],
-        'std_reward': [],
-        'deviation_opportunities': [],
-        'deviations': [],
-        'avg_picked_requests': [],
-        'early_trips': [],
-        'late_trips': []
-    }
+# def evaluate_slopes(minimum_request_slopes=MINIMUM_REQUEST_SLOPES, 
+#                     reward_weights=[TRIP_WEIGHT],):
+#     slope_results = {
+#         'slope': [],
+#         'reward_weight': [],
+#         'mean_reward': [],
+#         'std_reward': [],
+#         'deviation_opportunities': [],
+#         'deviations': [],
+#         'avg_picked_requests': [],
+#         'early_trips': [],
+#         'late_trips': []
+#     }
 
-    # Loop through all combinations using product
-    for slope, reward_weight in product(minimum_request_slopes, reward_weights):
-        np.random.seed(0)
-        summary_results = evaluate_heuristic(slope, reward_weight=reward_weight, n_episodes=30)
-        print(f"Evaluating slope {slope}, reward_weight {reward_weight}")
-        slope_results['slope'].append(slope)
-        slope_results['reward_weight'].append(reward_weight)
-        for key in summary_results:
-            if key not in slope_results:
-                slope_results[key] = []
-            slope_results[key].append(summary_results[key])
-    return slope_results
+#     # Loop through all combinations using product
+#     for slope, reward_weight in product(minimum_request_slopes, reward_weights):
+#         np.random.seed(0)
+#         summary_results = evaluate_heuristic(slope, reward_weight=reward_weight, n_episodes=30)
+#         print(f"Evaluating slope {slope}, reward_weight {reward_weight}")
+#         slope_results['slope'].append(slope)
+#         slope_results['reward_weight'].append(reward_weight)
+#         for key in summary_results:
+#             if key not in slope_results:
+#                 slope_results[key] = []
+#             slope_results[key].append(summary_results[key])
+#     return slope_results
 
     # if save_history:
     #     # Get the current date and time
