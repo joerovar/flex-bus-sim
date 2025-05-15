@@ -5,8 +5,6 @@ PATH_STOPS = 'data/stops.csv'
 MAX_TIME_HOURS = 5.0 # hours
 BUFFER_SECONDS = 3600 # seconds
 N_VEHICLES = 2
-# RESULTS_START_TIME_MINUTES = 30
-# RESULTS_END_TIME_MINUTES = 180
 
 ## route layout
 N_STOPS = 7 # per direction
@@ -32,10 +30,10 @@ CONTROL_STOPS_STOP_MAPPING = {
 }
 
 ## travel/dwell times
-STATIC_DWELL = 6 # seconds
-DYNAMIC_DWELL = 2 # seconds
+STATIC_DWELL = 8 # seconds
+DYNAMIC_DWELL = 2.1 # seconds
 SEGMENT_TIMES = {
-    'flex': {'mean': 82, 'std': 20},
+    'flex': {'mean': 80, 'std': 20},
     'fixed': {'mean': 110, 'std': 30}
 }
 
@@ -56,7 +54,7 @@ SCHEDULED_STOP_TIMES = [
 def get_od_matrix(od_low, od_high):
     return [
         [0, od_low, 0, od_high, 0, od_high, 0],
-        [0, 0, 0, od_low, 0, od_low, od_high],
+        [0, 0, 0, od_low, 0, od_high, od_high],
         [0, 0, 0, 0, 0, od_low, od_low], ## FLEX
         [0, 0, 0, 0, 0, od_low, od_high],
         [0, 0, 0, 0, 0, 0, od_low], ## FLEX

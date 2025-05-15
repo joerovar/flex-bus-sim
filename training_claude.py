@@ -125,6 +125,9 @@ class SharedDQNAgent:
         if state["n_requests"][0] == 0:
             return 0
         
+        if state['schedule_deviation'][0] > 5:
+            return 0
+        
         state_array = np.concatenate([
             state["control_stop_idx"],
             state["n_requests"], 

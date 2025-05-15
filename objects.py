@@ -42,7 +42,6 @@ class Stop:
             return time_now - self.last_arrival_time[-1]
         return self.last_arrival_time[-1] - self.last_arrival_time[-2]
 
-
 class Schedule:
     def __init__(self) -> None:
         self.deps = {
@@ -229,8 +228,24 @@ class Vehicle:
             ## continue onto layover
             self.layover(route, dwell_time, time_now)
         else:
-            self.event['next']['time'] = time_now + dwell_time
             self.event['next']['type'] = 'depart'
+
+            # for setting the time we need to consider the headway
+            depart_time = time_now + dwell_time
+            last_arrival_times = route.stops[self.direction][stop_idx].last_arrival_time
+            if len(last_arrival_times) < 2:
+                self.event['next']['time'] = depart_time
+            else:
+                expected_headway = depart_time - last_arrival_times[-2]
+                min_allowable_headway = 90
+                if expected_headway < min_allowable_headway:
+                    new_depart_time = depart_time + (min_allowable_headway - expected_headway)
+                    self.event['next']['time'] = new_depart_time
+                    # print(f"Vehicle {self.idx} at stop {stop_idx} with expected headway {round(expected_headway)}")
+                    # print(f"Time difference: {round(min_allowable_headway - expected_headway)}")
+                    # print(f"Current time: {round(time_now)}, Old depart time {depart_time} New depart time: {new_depart_time}")
+                else:
+                    self.event['next']['time'] = depart_time
 
         # print(f"Vehicle {self.idx} arrived at stop {stop_idx} in direction {self.direction} at {time_now}")
     
@@ -288,18 +303,6 @@ class EnvironmentManager:
         history = {}
         history['pax'] = get_pax_history(self.route, FLEX_STOPS, include_denied=True)
         history['vehicles'] = get_vehicle_history(self.route.vehicles, FLEX_STOPS)
-        
-        # state_histories = []
-        # for i in range(N_VEHICLES):
-        #     if len(self.state_hist[i]['observation']) != len(self.state_hist[i]['reward']):
-        #         # print(f"Lengths do not match for vehicle {i}: obs {len(self.state_hist[i]['observation'])} vs rew {len(self.state_hist[i]['reward'])}")
-        #         self.state_hist[i]['time'].pop(-1)
-        #         self.state_hist[i]['observation'].pop(-1)
-        #     state_hist = pd.DataFrame(self.state_hist[i])
-        #     state_hist['veh_idx'] = i
-        #     state_histories.append(state_hist)
-        
-        # history['state'] = pd.concat(state_histories, ignore_index=True)
         
         history['idle'] = pd.DataFrame(self.route.idle_time)
         return history
@@ -408,25 +411,6 @@ class EnvironmentManager:
             if stop_idx != CONTROL_STOPS[0]:
                 self.state_hist[self.veh_idx]['done'].append(done)
                 self.state_hist[self.veh_idx]['next_observation'].append(observation)
-            # let's print out the length for everything if it is veh_idx=0
-
-            # if the headway is less than a threshold, we set the next time as the difference
-            headway_threshold = 150 # statistically derived
-            headway = observation[2]
-            diff_headway = headway - headway_threshold
-            if diff_headway < 0:
-                # advance the clock
-                self.route.vehicles[self.veh_idx].event['next']['time'] += abs(diff_headway)
-                
-                # check if time has exceeded
-                if time_now > MAX_TIME_HOURS*60*60 - BUFFER_SECONDS:
-                    terminated = 1
-                    reward = 0
-                    info = {}
-                    return observation, reward, done, terminated, info
-                
-                # continue to next step
-                return self.step(action=None)
             
             # get reward
             if stop_idx == CONTROL_STOPS[0] or (len(self.state_hist[self.veh_idx]['observation'])==0):
@@ -443,14 +427,6 @@ class EnvironmentManager:
                 else:
                     # scenario 3: if the vehicle is on schedule, then the reward is the sum of the unweighted rewards
                     unweighted_rewards.append(0)
-                # if len(unweighted_rewards) < 2:
-                #     print(f"Vehicle {self.veh_idx} unweighted rewards: {self.state_hist[self.veh_idx]['unweighted_rewards']}")
-                #     print(f"stop index: {stop_idx}")
-                #     print(f"Observation history: {self.state_hist[self.veh_idx]['observation']}")
-                #     print(f"Next Observation history: {self.state_hist[self.veh_idx]['next_observation']}")
-                #     print(f"Action history: {self.state_hist[self.veh_idx]['action']}")
-                #     print(f"current weighted rewards: {unweighted_rewards}")
-                #     print(f"Done history: {self.state_hist[self.veh_idx]['done']}")
                 weighted_rewards = [-1.0 *unweighted_rewards[0], TRIP_WEIGHT * unweighted_rewards[1]]
                 reward = np.float32(np.sum(weighted_rewards))
                 self.state_hist[self.veh_idx]['unweighted_rewards'].append(unweighted_rewards)
@@ -458,24 +434,6 @@ class EnvironmentManager:
                 
                 # reset unweighted rewards
                 self.unweighted_rewards_per_vehicle[self.veh_idx] = []
-            
-            # if self.veh_idx == 0:
-            #     for ky in self.state_hist[self.veh_idx]:
-            #         print(f"Time: {time_now}")
-            #         print(f"Length of {ky}: {len(self.state_hist[self.veh_idx][ky])}")
-            #     print("-------")
-
-            # if self.state_hist[self.veh_idx]['observation']:
-            #     inter_event_counts = self.route.inter_event[self.veh_idx]
-            #     # if self.veh_idx == 0:
-            #     #     print(f"Vehicle {self.veh_idx} inter_event_counts: {inter_event_counts['skipped_requests']}")
-            #     reward, unweighted_rewards = get_reward(inter_event_counts, self.reward_weight)
-            #     self.state_hist[self.veh_idx]['reward'].append(reward)
-            #     self.state_hist[self.veh_idx]['unweighted_rewards'].append(unweighted_rewards)
-            #     # if self.veh_idx == 0:
-            #     #     print(f"Added rewards {self.state_hist[self.veh_idx]['unweighted_rewards'][-1]} for vehicle {self.veh_idx} at time {time_now}")
-            # else:
-            #     reward, unweighted_rewards = np.nan, np.nan
 
             info = self.route.inter_event[self.veh_idx].copy()
             ## add time
