@@ -37,6 +37,20 @@ SEGMENT_TIMES = {
     'fixed': {'mean': 110, 'std': 30}
 }
 
+# # 5 percent
+# SEGMENT_TIMES['fixed']['std'] = 31.5
+
+# 10 percent
+# SEGMENT_TIMES['fixed']['std'] = 33
+
+# 15 percent
+# SEGMENT_TIMES['fixed']['std'] = 34.5
+
+# # 20 percent
+SEGMENT_TIMES['fixed']['std'] = 36
+
+
+
 ## service design
 SCHEDULE_HEADWAY = 10 ## minutes
 N_TRIPS = 100
